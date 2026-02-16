@@ -1,0 +1,3166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>定常タスク管理ツール</title>
+    <style>
+    :root {
+        font-family: "Segoe UI", "Yu Gothic UI", Meiryo, sans-serif;
+        font-size: 16px;
+      color: #1f2933;
+      background: #f4f4f6;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #f4f4f6;
+      font-weight: 500;
+      font-size: 16px;
+    }
+    .app-shell {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 24px 8px 48px;
+    }
+    header {
+      margin-bottom: 8px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .tab-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      gap: 12px;
+    }
+    .tab-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .tab-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .tab-buttons button,
+    .tab-controls button,
+    .filters button {
+      border: none;
+      border-radius: 6px;
+      padding: 6px 14px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .tab-buttons button:disabled {
+      cursor: default;
+      opacity: 1;
+    }
+    .tab-buttons button.active,
+    .tab-controls button {
+      background: #1d4ed8;
+    }
+    .tab-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .user-badge {
+      font-size: 0.9rem;
+      color: #475569;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #eef2f7;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+    }
+    .user-badge .username {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #111827;
+    }
+    .user-badge .organization {
+      font-size: 0.85rem;
+      color: #1e293b;
+    }
+    .tab-actions button {
+      border-radius: 6px;
+      border: none;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      background: #1f2937;
+      color: #fff;
+      cursor: pointer;
+    }
+    .tab-actions span {
+      font-size: 0.85rem;
+      color: #475569;
+    }
+    .screen {
+      margin-bottom: 24px;
+    }
+    .screen.hidden {
+      display: none;
+    }
+    .selected-row {
+      background: #e0f2fe;
+    }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 12px;
+      align-items: flex-end;
+    }
+    .parent-kind-tabs,
+    .routine-kind-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .parent-kind-tabs button,
+    .routine-kind-tabs button {
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #1f2933;
+      border-radius: 6px;
+      padding: 4px 12px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .parent-kind-tabs button.active,
+    .routine-kind-tabs button.active {
+      background: #1d4ed8;
+      color: #fff;
+      border-color: #1d4ed8;
+    }
+    .filters label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.75rem;
+      color: #475569;
+      gap: 4px;
+    }
+    .status-line {
+      font-size: 0.85rem;
+      color: #475569;
+    }
+    .table-wrapper {
+      background: #fff;
+      border-radius: 10px;
+      border: 1px solid #d5d7db;
+      overflow-x: auto;
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
+    }
+    .table-footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 8px;
+      padding: 0 8px 12px;
+    }
+    .pagination {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .pagination button {
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #1f2933;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .pagination button:disabled {
+      color: #94a3b8;
+      border-color: #e2e8f0;
+      cursor: not-allowed;
+    }
+    .pagination span {
+      font-size: 0.85rem;
+      color: #475569;
+    }
+    table {
+      width: 100%;
+      min-width: 1280px;
+      border-collapse: collapse;
+      table-layout: auto;
+      font-size: 0.78rem;
+    }
+    #parent-table,
+    #routine-table {
+      table-layout: fixed;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+    thead {
+      background: #eef2f7;
+    }
+    th {
+      padding: 8px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: center;
+      vertical-align: middle;
+      white-space: normal;
+      word-break: break-word;
+      min-width: 0;
+      font-weight: 700;
+    }
+    td {
+      padding: 8px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+      vertical-align: middle;
+      white-space: normal;
+      word-break: break-word;
+      min-width: 0;
+      font-weight: 400;
+    }
+    #routine-table th,
+    #routine-table td,
+    #parent-table th,
+    #parent-table td {
+      font-size: 0.85rem;
+    }
+    :root {
+      --list-col-divider: rgba(148, 163, 184, 0.35);
+    }
+    /* Set --list-col-divider: transparent; to disable quickly */
+    #parent-table th + th,
+    #parent-table td + td,
+    #routine-table th + th,
+    #routine-table td + td {
+      border-left: 0;
+      box-shadow: inset 1px 0 0 var(--list-col-divider);
+    }
+    #parent-table thead th.sortable,
+    #routine-table thead th.sortable {
+      cursor: pointer;
+    }
+    #parent-table td:first-child {
+      width: 28px;
+      min-width: 28px;
+      max-width: 28px;
+      padding: 0;
+      text-align: center;
+      white-space: nowrap;
+    }
+    #routine-table td:first-child {
+      width: 56px;
+      min-width: 56px;
+      max-width: 56px;
+      padding: 6px 4px;
+      text-align: center;
+      white-space: nowrap;
+    }
+    #parent-table th:first-child {
+      width: 28px;
+      min-width: 28px;
+      max-width: 28px;
+      white-space: nowrap;
+      text-align: center;
+      padding: 4px 2px;
+    }
+    #routine-table th:first-child {
+      width: 56px;
+      min-width: 56px;
+      max-width: 56px;
+      white-space: nowrap;
+      text-align: center;
+    }
+    #parent-table td.complete-cell,
+    #routine-table td.complete-cell {
+      display: table-cell;
+      padding-left: 4px !important;
+      padding-right: 4px !important;
+      text-align: center !important;
+      position: relative;
+    }
+    #parent-table td.complete-cell {
+      padding: 0 !important;
+    }
+    #parent-table .parent-complete-checkbox {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      appearance: auto;
+    }
+    #routine-table .routine-complete-checkbox {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      appearance: auto;
+    }
+    #parent-table td.complete-cell .parent-complete-checkbox,
+    #routine-table td.complete-cell .routine-complete-checkbox {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      margin: 0 !important;
+    }
+    #routine-table td.complete-cell .routine-complete-checkbox {
+      float: none;
+    }
+    #parent-table th:nth-child(2),
+    #parent-table td:nth-child(2) {
+      width: 20px;
+      min-width: 20px;
+      max-width: 20px;
+      white-space: nowrap;
+    }
+    #routine-table th:nth-child(2),
+    #routine-table td:nth-child(2) {
+      width: 72px;
+      min-width: 72px;
+      max-width: 72px;
+      white-space: nowrap;
+    }
+    #routine-table td:nth-child(5),
+    #routine-table td:nth-child(6),
+    #routine-table td:nth-child(7),
+    #routine-table td:nth-child(8),
+    #routine-table td:nth-child(9),
+    #routine-table th:nth-child(5),
+    #routine-table th:nth-child(6),
+    #routine-table th:nth-child(7),
+    #routine-table th:nth-child(8),
+    #routine-table th:nth-child(9) {
+      white-space: nowrap;
+    }
+    #routine-table td:nth-child(10),
+    #routine-table th:nth-child(10) {
+      white-space: nowrap;
+    }
+    #parent-table td:nth-child(2) {
+      text-align: right;
+    }
+    #routine-table td:nth-child(2),
+    #routine-table td:nth-child(3),
+    #routine-table td:nth-child(5),
+    #routine-table td:nth-child(6),
+    #routine-table td:nth-child(7),
+    #routine-table td:nth-child(8),
+    #routine-table td:nth-child(9) {
+      text-align: right;
+    }
+    #routine-table td:nth-child(14),
+    #routine-table th:nth-child(14) {
+      min-width: 280px;
+    }
+    #routine-modal-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+    tbody tr:nth-child(even) {
+      background: #fbfcfe;
+    }
+    #routine-table tbody tr.due-alert td {
+      background: #fee2e2 !important;
+    }
+    .creation-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px;
+      z-index: 900;
+    }
+    .creation-overlay.hidden {
+      display: none;
+    }
+      .creation-panel {
+        width: min(900px, 95vw);
+        max-width: 900px;
+        max-height: 90vh;
+        overflow-y: auto;
+        background: #fff;
+        border-radius: 14px;
+        padding: 16px 18px;
+        box-shadow: 0 16px 32px rgba(15, 23, 42, 0.2);
+      }
+    .creation-panel h2 {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+    }
+    .form-row {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .form-row.full-row {
+      grid-template-columns: 1fr;
+    }
+    .form-row.first-row {
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    }
+    .form-row.date-row {
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+    }
+    .form-row.second-row {
+      grid-template-columns: 1fr;
+    }
+    .form-row.two-column {
+      grid-template-columns: repeat(2, minmax(200px, 1fr));
+    }
+    .form-row.three-column {
+      grid-template-columns: repeat(3, minmax(160px, 1fr));
+    }
+    #routine-form .title-kind-row {
+      grid-template-columns: minmax(280px, 1fr) 160px;
+      align-items: end;
+    }
+    label {
+      font-size: 0.75rem;
+      color: #475569;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .form-row label span {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #1f2933;
+    }
+    .form-row.full-row input,
+    .form-row.date-row input,
+    .form-row.date-row select,
+    .form-row.first-row select,
+    .form-row.two-column input {
+      width: 100%;
+    }
+    .link-button {
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      color: #1d4ed8;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    small {
+      font-size: 0.65rem;
+      color: #64748b;
+      line-height: 1.2;
+    }
+      input,
+      select,
+      textarea {
+        padding: 6px 8px;
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
+        font-size: 0.85rem;
+        font-family: inherit;
+        background: #fff;
+      min-width: 110px;
+    }
+      input[type="month"],
+      input[type="date"] {
+        min-width: 140px;
+        max-width: 160px;
+      }
+      input[disabled],
+      select[disabled],
+      textarea[disabled] {
+        background: #f3f4f6;
+        color: #6b7280;
+        cursor: not-allowed;
+      }
+    textarea {
+      min-height: 70px;
+      resize: vertical;
+    }
+    #routine-edit-form select[name="status"] {
+      min-width: 140px;
+      max-width: 160px;
+      width: 160px;
+    }
+    #routine-edit-form textarea[name="summary"] {
+      width: 100%;
+      min-width: 0;
+    }
+    #routine-form select[name="task_kind"] {
+      width: 160px;
+      min-width: 140px;
+      max-width: 160px;
+    }
+    #routine-form .creation-summary-actions-row {
+      grid-template-columns: minmax(260px, 1fr) auto;
+      align-items: end;
+      gap: 10px;
+    }
+    #routine-form .creation-summary-actions-row label {
+      width: 100%;
+      max-width: 420px;
+    }
+    #routine-form .creation-summary-actions-row textarea[name="summary"] {
+      width: 100%;
+      min-width: 0;
+    }
+    #routine-form .creation-summary-actions-row .form-actions {
+      margin-top: 0;
+      justify-content: flex-start;
+      align-self: end;
+    }
+    #routine-edit-overlay .creation-panel {
+      width: min(760px, 92vw);
+      max-width: 760px;
+    }
+    #routine-edit-form .summary-actions-row {
+      grid-template-columns: repeat(2, minmax(200px, 1fr));
+      align-items: start;
+    }
+    #routine-edit-form .summary-actions-row .form-actions {
+      margin-top: 0;
+      justify-content: flex-start;
+      align-self: end;
+    }
+    @media (max-width: 720px) {
+      #routine-form .title-kind-row,
+      #routine-form .creation-summary-actions-row {
+        grid-template-columns: 1fr;
+      }
+      #routine-form .creation-summary-actions-row label {
+        max-width: none;
+      }
+      #routine-form .creation-summary-actions-row .form-actions {
+        justify-content: flex-end;
+      }
+      #routine-edit-form .summary-actions-row {
+        grid-template-columns: 1fr;
+      }
+      #routine-edit-form .summary-actions-row .form-actions {
+        justify-content: flex-end;
+      }
+    }
+    .assignee-manager {
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 8px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .assignee-manager .assignee-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 30px;
+    }
+    .assignee-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0;
+      border-radius: 999px;
+      background: #eef2ff;
+      border: 1px solid #cbd5e1;
+      padding: 2px 10px;
+      font-size: 0.75rem;
+      color: #1f2933;
+      pointer-events: none;
+    }
+    .assignee-chip__label {
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      pointer-events: auto;
+      padding: 0;
+    }
+    .assignee-chip__label::after {
+      content: "×";
+      font-weight: 700;
+      margin-left: 4px;
+    }
+    .assignee-entry {
+      display: flex;
+      gap: 6px;
+    }
+    .assignee-entry input {
+      flex: 1;
+    }
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .form-actions button {
+      border: none;
+      border-radius: 6px;
+      padding: 6px 16px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .form-actions button.primary {
+      background: #2563eb;
+      color: #fff;
+    }
+    .form-actions button.secondary {
+      background: #e2e8f0;
+      color: #1f2933;
+    }
+    .form-message {
+      font-size: 0.75rem;
+      color: #dc2626;
+      min-height: 18px;
+      margin-top: 4px;
+    }
+    .routine-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px;
+      z-index: 950;
+    }
+    .routine-modal-overlay.hidden {
+      display: none;
+    }
+    .routine-modal-panel {
+      width: min(720px, 100%);
+      background: #fff;
+      border-radius: 14px;
+      padding: 16px 18px;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.25);
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .routine-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .routine-modal-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .routine-modal-actions button {
+      border: none;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: #fff;
+    }
+    .routine-modal-actions #routine-modal-edit {
+      background: #2563eb;
+    }
+    .routine-modal-actions #routine-modal-close {
+      background: #94a3b8;
+    }
+    .routine-modal-table-wrapper {
+      flex: 1;
+      overflow: auto;
+    }
+    .routine-modal-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .routine-modal-table-wrapper th,
+    .routine-modal-table-wrapper td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+    .theme-modern {
+      background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+      color: #0f172a;
+      --accent-1: #2563eb;
+      --accent-2: #1d4ed8;
+      --accent-3: #1e40af;
+      --accent-ink: #1e3a8a;
+      --accent-soft: #bfdbfe;
+      --accent-pale: #e8effb;
+      --accent-head: #eaf1fb;
+      --accent-hover: #f0f7ff;
+    }
+    .theme-modern.screen-routines {
+      --accent-1: #ef4444;
+      --accent-2: #dc2626;
+      --accent-3: #b91c1c;
+      --accent-ink: #7f1d1d;
+      --accent-soft: #fecaca;
+      --accent-pale: #fee2e2;
+      --accent-head: #feecef;
+      --accent-hover: #fff1f2;
+    }
+    .theme-modern .app-shell {
+      max-width: 1700px;
+    }
+    .theme-modern header {
+      position: relative;
+      margin-bottom: 12px;
+      padding: 14px 18px;
+      border-radius: 12px;
+      overflow: hidden;
+      background: linear-gradient(135deg, #475569 0%, #64748b 55%, #94a3b8 100%);
+      box-shadow: 0 8px 20px rgba(51, 65, 85, 0.28);
+    }
+    .theme-modern header::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(
+          -35deg,
+          rgba(255, 255, 255, 0.14) 0,
+          rgba(255, 255, 255, 0.14) 8px,
+          rgba(255, 255, 255, 0.03) 8px,
+          rgba(255, 255, 255, 0.03) 20px
+        );
+      pointer-events: none;
+    }
+    .theme-modern header h1 {
+      position: relative;
+      color: #ffffff;
+      text-shadow: 0 1px 2px rgba(15, 23, 42, 0.35);
+    }
+    .theme-modern .table-wrapper {
+      border: 1px solid var(--accent-soft);
+      border-radius: 14px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    }
+    .theme-modern .tab-line {
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid var(--accent-soft);
+      border-radius: 12px;
+      padding: 8px 10px;
+      backdrop-filter: blur(8px);
+    }
+    .theme-modern .tab-buttons {
+      background: var(--accent-pale);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 4px;
+    }
+    .theme-modern .tab-buttons button {
+      box-shadow: none;
+      background: transparent;
+      color: var(--accent-ink);
+      border: 1px solid transparent;
+    }
+    .theme-modern .tab-buttons button.active {
+      background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+      color: #ffffff;
+      border-color: #4b5563;
+      box-shadow: 0 4px 10px rgba(31, 41, 55, 0.22);
+    }
+    .theme-modern .tab-buttons button:disabled {
+      cursor: default;
+    }
+    .theme-modern .user-badge {
+      background: linear-gradient(135deg, #ffffff 0%, var(--accent-pale) 100%);
+      border: 1px solid var(--accent-soft);
+      border-radius: 999px;
+      padding: 6px 14px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+    .theme-modern .user-badge .username {
+      color: var(--accent-ink);
+    }
+    .theme-modern .user-badge .organization {
+      color: #334155;
+    }
+    .theme-modern .filters {
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid var(--accent-soft);
+      border-radius: 12px;
+      padding: 10px 12px;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+    }
+    .theme-modern .filters select,
+    .theme-modern .filters input {
+      border-color: var(--accent-soft);
+      box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.08);
+    }
+    .theme-modern th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    .theme-modern td {
+      transition: background-color 0.12s ease;
+    }
+    .theme-modern tbody tr:hover td {
+      background: var(--accent-hover);
+    }
+    .theme-modern thead {
+      background: var(--accent-head);
+    }
+    .theme-modern th {
+      color: var(--accent-ink);
+      letter-spacing: 0.02em;
+    }
+    .theme-modern .tab-buttons button,
+    .theme-modern .tab-controls button,
+    .theme-modern .filters button {
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 100%);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+    .theme-modern .tab-controls button {
+      background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent-3) 100%);
+    }
+    .theme-modern .tab-buttons button:hover,
+    .theme-modern .tab-controls button:hover,
+    .theme-modern .filters button:hover {
+      filter: brightness(1.04);
+    }
+    .theme-modern tbody tr:nth-child(even) {
+      background: #f8fbff;
+    }
+    .theme-modern .parent-kind-tabs button,
+    .theme-modern .routine-kind-tabs button {
+      border-color: var(--accent-soft);
+      color: var(--accent-ink);
+      background: #ffffff;
+    }
+    .theme-modern .parent-kind-tabs button.active,
+    .theme-modern .routine-kind-tabs button.active {
+      background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 100%);
+      color: #ffffff;
+      border-color: var(--accent-2);
+    }
+    .theme-modern .pagination button {
+      border-color: var(--accent-soft);
+      color: var(--accent-ink);
+    }
+    .theme-modern .form-actions button.primary,
+    .theme-modern .routine-modal-actions #routine-modal-edit {
+      background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 100%);
+    }
+    .theme-modern.screen-routines .tab-controls button,
+    .theme-modern.screen-routines .filters button,
+    .theme-modern.screen-routines .parent-kind-tabs button.active,
+    .theme-modern.screen-routines .routine-kind-tabs button.active,
+    .theme-modern.screen-routines .form-actions button.primary,
+    .theme-modern.screen-routines .routine-modal-actions #routine-modal-edit {
+      border-color: transparent;
+    }
+    .theme-modern .tab-buttons button.active,
+    .theme-modern .tab-controls button,
+    .theme-modern .filters button,
+    .theme-modern .parent-kind-tabs button.active,
+    .theme-modern .routine-kind-tabs button.active,
+    .theme-modern .form-actions button.primary,
+    .theme-modern .form-actions button.secondary,
+    .theme-modern .routine-modal-actions button {
+      color: #ffffff;
+    }
+    .theme-modern #routine-table tbody tr.due-alert td {
+      background: #fee2e2 !important;
+      color: #7f1d1d;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<!-- Revert quickly: remove `theme-modern` from body class -->
+<body class="theme-modern">
+  <div class="app-shell">
+    <header>
+      <h1 id="page-title">親タスク一覧</h1>
+    </header>
+    <div class="tab-line">
+      <div class="tab-controls">
+        <button id="open-create-btn" type="button">タスク作成</button>
+        <div class="tab-buttons">
+          <button type="button" data-screen="parents" class="active">親タスク一覧</button>
+          <button type="button" data-screen="routines">ルーチン一覧</button>
+        </div>
+      </div>
+      <div class="tab-actions">
+        <div class="user-badge" id="user-badge" aria-live="polite">
+          <span class="username">-</span>
+          <span class="organization">所属組織 -</span>
+        </div>
+      </div>
+    </div>
+    <section id="parent-screen" class="screen">
+      <div class="parent-kind-tabs">
+        <button type="button" class="active" data-kind-filter="all">全て</button>
+        <button type="button" data-kind-filter="グループ">グループ</button>
+        <button type="button" data-kind-filter="個人">個人</button>
+      </div>
+      <div class="table-wrapper">
+        <table id="parent-table">
+            <colgroup>
+              <col style="width:28px;" />
+              <col style="width:20px;" />
+              <col style="width:5ch;" />
+              <col style="width:19ch;" />
+              <col style="width:5ch;" />
+              <col style="width:5ch;" />
+              <col style="width:5ch;" />
+              <col style="width:20ch;" />
+              <col style="width:5ch;" />
+              <col style="width:5ch;" />
+              <col style="width:16ch;" />
+            </colgroup>
+          <thead>
+            <tr>
+              <th>完了</th>
+              <th>親No</th>
+              <th>タスク区分</th>
+              <th>タイトル</th>
+              <th>頻度</th>
+              <th>開始月</th>
+              <th>終了月</th>
+              <th>担当者</th>
+              <th>登録者</th>
+              <th>ステータス</th>
+              <th>備考</th>
+            </tr>
+          </thead>
+          <tbody id="parent-table-body"></tbody>
+        </table>
+          <div class="table-footer">
+            <div class="pagination" id="parent-pagination">
+              <button type="button" id="parent-page-prev">前</button>
+              <span id="parent-page-label">ページ 1</span>
+              <button type="button" id="parent-page-next">次</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    <section id="routine-screen" class="screen hidden">
+      <div class="routine-kind-tabs">
+        <button type="button" class="active" data-routine-kind-filter="all">全て</button>
+        <button type="button" data-routine-kind-filter="グループ">グループ</button>
+        <button type="button" data-routine-kind-filter="個人">個人</button>
+      </div>
+      <div class="filters">
+        <label>
+          年
+          <select name="filter-routine-year"></select>
+        </label>
+        <label>
+          月
+          <select name="filter-routine-month"></select>
+        </label>
+        <label>
+          担当者
+          <select name="filter-routine-assignee"></select>
+        </label>
+        <button id="routine-filter-btn" type="button">絞り込み</button>
+        <button id="routine-clear-btn" type="button">クリア</button>
+      </div>
+      <div class="table-wrapper">
+        <table id="routine-table">
+          <colgroup>
+            <col style="width:56px;" />
+            <col style="width:72px;" />
+            <col style="width:12ch;" />
+            <col style="width:36ch;" />
+            <col style="width:7ch;" />
+            <col style="width:7ch;" />
+            <col style="width:7ch;" />
+            <col style="width:6ch;" />
+            <col style="width:6ch;" />
+            <col style="width:10ch;" />
+            <col style="width:30ch;" />
+            <col style="width:16ch;" />
+            <col style="width:16ch;" />
+            <col style="width:20ch;" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th aria-label="完了" style="width:56px;">完了</th>
+              <th>タスク</th>
+              <th>ルーチン</th>
+              <th>タイトル</th>
+              <th>年</th>
+              <th>半期</th>
+              <th>四半期</th>
+              <th>月</th>
+              <th>週</th>
+              <th>期日</th>
+              <th>担当者</th>
+              <th>登録者</th>
+              <th>ステータス</th>
+              <th>備考</th>
+            </tr>
+          </thead>
+          <tbody id="routine-table-body"></tbody>
+          </table>
+          <div class="table-footer">
+            <div class="pagination" id="routine-pagination">
+              <button type="button" id="routine-page-prev">前</button>
+              <span id="routine-page-label">ページ 1</span>
+              <button type="button" id="routine-page-next">次</button>
+            </div>
+          </div>
+        </div>
+    </section>
+  </div>
+
+  <div class="creation-overlay hidden" id="creation-overlay">
+    <section class="creation-panel" aria-modal="true" role="dialog">
+      <h2>タスク作成</h2>
+      <form id="routine-form">
+        <input type="hidden" name="task_no" />
+        <div class="form-row title-kind-row">
+          <label>
+            <span>タスク名</span>
+            <input type="text" name="title" required />
+          </label>
+          <label>
+            <span>タスク区分</span>
+            <select name="task_kind">
+              <option value="個人">個人</option>
+              <option value="グループ">グループ</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-row first-row">
+          <label>
+            <span>頻度</span>
+            <select name="frequency" required>
+              <option value="">選択</option>
+              <option value="スポット">スポット</option>
+              <option value="週次">週次</option>
+              <option value="月次">月次</option>
+              <option value="四半期">四半期</option>
+              <option value="半期">半期</option>
+              <option value="年次">年次</option>
+            </select>
+          </label>
+          <label>
+            <span>半期</span>
+            <select name="half_year">
+              <option value="">-</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+            </select>
+          </label>
+          <label>
+            <span>四半期</span>
+            <select name="quarter">
+              <option value="">-</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+            </select>
+          </label>
+          <label>
+            <span>月</span>
+            <select name="month">
+              <option value="">-</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+              <option value="8">8</option>
+              <option value="9">9</option>
+              <option value="10">10</option>
+              <option value="11">11</option>
+              <option value="12">12</option>
+            </select>
+          </label>
+          <label>
+            <span>週</span>
+            <select name="week">
+              <option value="">-</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-row first-row">
+          <label>
+            <span>開始月</span>
+            <input type="month" name="start_month" required />
+          </label>
+          <label>
+            <span>終了月</span>
+            <input type="month" name="end_month" />
+          </label>
+          <label>
+            <span>期日</span>
+            <input type="date" name="due_date" />
+          </label>
+          
+        </div>
+        <div class="form-row three-column">
+          <label>
+            <span>担当者</span>
+            <div class="assignee-manager">
+              <div class="assignee-list" id="creation-assignee-list"></div>
+              <div class="assignee-entry">
+                <select id="creation-assignee-select">
+                  <option value="">担当者を追加</option>
+                </select>
+              </div>
+            </div>
+            <input type="hidden" name="assignee" />
+          </label>
+          <label>
+            <span>登録者</span>
+            <input type="text" name="registrant" readonly />
+          </label>
+          <label>
+            <span>備考</span>
+            <textarea name="summary"></textarea>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="primary" type="submit">登録</button>
+          <button class="secondary" type="button" id="cancel-create">閉じる</button>
+        </div>
+        <p class="form-message" id="form-message"></p>
+      </form>
+    </section>
+  </div>
+
+  <div class="creation-overlay hidden" id="parent-edit-overlay">
+    <section class="creation-panel" aria-modal="true" role="dialog">
+      <h2>親タスク編集</h2>
+      <form id="parent-edit-form">
+        <input type="hidden" name="task_no" />
+        <div class="form-row second-row">
+          <label>
+            <span>ステータス</span>
+            <select name="status">
+              <option value="未着手">未着手</option>
+              <option value="着手">着手</option>
+              <option value="完了">完了</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-row second-row">
+          <label>
+            <span>備考</span>
+            <textarea name="summary"></textarea>
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="primary" type="submit">更新</button>
+          <button class="secondary" type="button" data-close="parent-edit-overlay">閉じる</button>
+        </div>
+        <p class="form-message" id="parent-edit-message"></p>
+      </form>
+    </section>
+  </div>
+
+      <div class="creation-overlay hidden" id="routine-edit-overlay">
+        <section class="creation-panel" aria-modal="true" role="dialog">
+          <h2>ルーチン編集</h2>
+          <form id="routine-edit-form">
+            <input type="hidden" name="record_no" />
+            <div class="form-row two-column">
+              <label>
+                <span>タイトル</span>
+                <input type="text" name="title" />
+              </label>
+              <label>
+                <span>期日</span>
+                <input type="date" name="due_date" />
+              </label>
+            </div>
+            <div class="form-row first-row">
+              <label>
+                <span>年</span>
+                <input type="number" name="edit_year" min="2000" max="2100" />
+              </label>
+              <label>
+                <span>半期</span>
+                <select name="edit_half_year">
+                  <option value="">-</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                </select>
+              </label>
+              <label>
+                <span>四半期</span>
+                <select name="edit_quarter">
+                  <option value="">-</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                </select>
+              </label>
+              <label>
+                <span>月</span>
+                <select name="edit_month">
+                  <option value="">-</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                  <option value="7">7</option>
+                  <option value="8">8</option>
+                  <option value="9">9</option>
+                  <option value="10">10</option>
+                  <option value="11">11</option>
+                  <option value="12">12</option>
+                </select>
+              </label>
+              <label>
+                <span>週</span>
+                <select name="edit_week">
+                  <option value="">-</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                </select>
+              </label>
+            </div>
+            <div class="form-row two-column">
+              <label>
+                <span>担当者</span>
+                <div class="assignee-manager">
+                  <div class="assignee-list" id="routine-edit-assignee-list"></div>
+                  <div class="assignee-entry">
+                    <select id="routine-edit-assignee-select">
+                      <option value="">担当者を追加</option>
+                    </select>
+                  </div>
+                </div>
+                <input type="hidden" name="assignee" />
+              </label>
+              <label>
+                <span>ステータス</span>
+                <select name="status">
+                  <option value="未着手">未着手</option>
+                  <option value="着手">着手</option>
+                  <option value="完了">完了</option>
+                </select>
+              </label>
+            </div>
+            <div class="form-row two-column summary-actions-row">
+              <label>
+                <span>備考</span>
+                <textarea name="summary"></textarea>
+              </label>
+              <div class="form-actions">
+                <button class="primary" type="submit">更新</button>
+                <button class="secondary" type="button" data-close="routine-edit-overlay">閉じる</button>
+              </div>
+            </div>
+            <p class="form-message" id="routine-edit-message"></p>
+          </form>
+      </section>
+    </div>
+
+  <div class="routine-modal-overlay hidden" id="routine-modal">
+    <section class="routine-modal-panel" aria-modal="true" role="dialog">
+      <div class="routine-modal-header">
+        <h2>関連ルーチン一覧</h2>
+        <div class="routine-modal-actions">
+          <button id="routine-modal-edit" type="button">選択タスク編集</button>
+          <button id="routine-modal-close" type="button">閉じる</button>
+        </div>
+      </div>
+      <div class="routine-modal-table-wrapper">
+        <table id="routine-modal-table">
+          <thead>
+            <tr>
+              <th>完了</th>
+              <th>ルーチンNo</th>
+              <th>期日</th>
+              <th>ステータス</th>
+              <th>備考</th>
+            </tr>
+          </thead>
+          <tbody id="routine-modal-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  <script>
+    (() => {
+      const pathname = location.pathname;
+      const basePath = (() => {
+        if (pathname === "/") {
+          return "/";
+        }
+        if (pathname.endsWith("/")) {
+          return pathname;
+        }
+        const lastSlash = pathname.lastIndexOf("/");
+        const lastSegment = pathname.slice(lastSlash + 1);
+        if (lastSegment && lastSegment.includes(".")) {
+          return pathname.slice(0, lastSlash + 1);
+        }
+        return `${pathname}/`;
+      })();
+      const apiBase = `${location.origin}${basePath}api.py/`;
+      const routinesEndpoint = `${apiBase}routines`;
+      const parentsEndpoint = `${apiBase}parents`;
+      const parentUpdate = (taskNo) => `${apiBase}parent/${taskNo}`;
+      const routineUpdate = (recordNo) => `${apiBase}child/${recordNo}`;
+      const parentCompleteEndpoint = (taskNo) => `${apiBase}parent/${taskNo}/complete`;
+      const currentUserEndpoint = `${apiBase}current-user`;
+      const routineCompleteEndpoint = (recordNo) => `${apiBase}child/${recordNo}/complete`;
+      const employeesEndpoint = `${apiBase}employees`;
+      const ALL_EMPLOYEES_LABEL = "社員全員";
+      const organizationUserNames = new Set();
+      const employeeOnlyUserNames = new Set();
+      let currentDepartmentCD = "";
+      let fetchedOrganizationEmployees = [];
+      let employeeOnlyCandidateNames = [];
+      const creationAssigneeSelect = document.getElementById("creation-assignee-select");
+      const routineEditAssigneeSelect = document.getElementById("routine-edit-assignee-select");
+      let currentLoginName = "";
+
+      const parentTableBody = document.getElementById("parent-table-body");
+      parentTableBody.addEventListener("change", async (event) => {
+        const checkbox = event.target.closest(".parent-complete-checkbox");
+        if (!checkbox) {
+          return;
+        }
+        const taskNo = Number(checkbox.dataset.taskNo);
+        if (!checkbox.checked) {
+          return;
+        }
+        checkbox.disabled = true;
+        const confirmed = window.confirm("タスクに紐づくルーチンをすべて完了にしますか");
+        if (!confirmed) {
+          checkbox.checked = false;
+          checkbox.disabled = false;
+          return;
+        }
+        try {
+          setStatus("完了処理を実行しています…");
+          const response = await fetch(parentCompleteEndpoint(taskNo), { method: "POST" });
+          if (!response.ok) {
+            throw new Error("完了処理に失敗しました");
+          }
+          checkbox.checked = false;
+          await Promise.all([fetchParents(), fetchRoutines()]);
+          setStatus("タスクを完了済みにしました");
+        } catch (error) {
+          setStatus(`完了処理に失敗しました: ${error.message}`);
+          checkbox.checked = false;
+        } finally {
+          checkbox.disabled = false;
+        }
+      });
+      const creationTitle = document.querySelector("#creation-overlay h2");
+      const routineTableBody = document.getElementById("routine-table-body");
+      const routineModalBody = document.getElementById("routine-modal-body");
+      function handleRoutineCompletion(checkbox) {
+        const recordNo = Number(checkbox.dataset.recordNo);
+        checkbox.disabled = true;
+        const confirmed = window.confirm("このルーチンを完了にしますか？");
+        if (!confirmed) {
+          checkbox.checked = false;
+          checkbox.disabled = false;
+          return;
+        }
+        return fetch(routineCompleteEndpoint(recordNo), { method: "POST" })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("完了処理に失敗しました");
+            }
+            checkbox.checked = false;
+            return Promise.all([fetchParents(), fetchRoutines()]);
+          })
+          .then(() => setStatus("ルーチンを完了しました"))
+          .catch((error) => {
+            setStatus(`ルーチンの完了に失敗しました: ${error.message}`);
+            checkbox.checked = false;
+          })
+          .finally(() => {
+            checkbox.disabled = false;
+          });
+      }
+      const routineCheckboxHandler = (event) => {
+        const checkbox = event.target.closest(".routine-complete-checkbox");
+        if (!checkbox || !checkbox.checked) {
+          return;
+        }
+        setStatus("ルーチンを完了にしています…");
+        handleRoutineCompletion(checkbox);
+      };
+      routineTableBody.addEventListener("change", routineCheckboxHandler);
+      routineModalBody.addEventListener("change", routineCheckboxHandler);
+      const screenButtons = document.querySelectorAll("[data-screen]");
+      const screens = {
+        parents: document.getElementById("parent-screen"),
+        routines: document.getElementById("routine-screen"),
+      };
+      const pageTitle = document.getElementById("page-title");
+      const routineFilterInputs = {
+        year: document.querySelector("[name='filter-routine-year']"),
+        month: document.querySelector("[name='filter-routine-month']"),
+        assignee: document.querySelector("[name='filter-routine-assignee']"),
+      };
+      function buildRoutineFilterYearOptions() {
+        const select = routineFilterInputs.year;
+        if (!select) {
+          return;
+        }
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const options = [];
+        for (let offset = -1; offset <= 1; offset++) {
+          const yearValue = currentYear + offset;
+          options.push(`<option value="${yearValue}">${yearValue}</option>`);
+        }
+        select.innerHTML = options.join("");
+      }
+      function buildRoutineFilterMonthOptions() {
+        const select = routineFilterInputs.month;
+        if (!select) {
+          return;
+        }
+        const options = Array.from({ length: 12 }, (_, idx) => {
+          const value = idx + 1;
+          return `<option value="${value}">${value}</option>`;
+        });
+        select.innerHTML = options.join("");
+      }
+      function updateRoutineFilterAssigneeOptions() {
+        const select = routineFilterInputs.assignee;
+        if (!select) {
+          return;
+        }
+        const previousValue = select.value;
+        const names = Array.from(organizationUserNames).sort((a, b) =>
+          a.localeCompare(b)
+        );
+        const optionNodes = ["<option value=\"\">全員</option>"];
+        optionNodes.push(
+          ...names.map((name) => `<option value="${name}">${name}</option>`)
+        );
+        select.innerHTML = optionNodes.join("");
+        if (previousValue && names.includes(previousValue)) {
+          select.value = previousValue;
+        } else {
+          select.value = "";
+        }
+      }
+      function setRoutineFilterDefaults() {
+        const now = new Date();
+        if (routineFilterInputs.year) {
+          routineFilterInputs.year.value = String(now.getFullYear());
+        }
+        if (routineFilterInputs.month) {
+          routineFilterInputs.month.value = String(now.getMonth() + 1);
+        }
+        if (routineFilterInputs.assignee) {
+          routineFilterInputs.assignee.value = "";
+        }
+      }
+      const routineFilterBtn = document.getElementById("routine-filter-btn");
+      const routineClearBtn = document.getElementById("routine-clear-btn");
+
+      const creationOverlay = document.getElementById("creation-overlay");
+      const openCreateBtn = document.getElementById("open-create-btn");
+      const routineForm = document.getElementById("routine-form");
+      const cancelBtn = document.getElementById("cancel-create");
+      const formMessage = document.getElementById("form-message");
+      const assigneeHiddenInput = routineForm.querySelector('[name="assignee"]');
+      const registrantInput = routineForm.querySelector('[name="registrant"]');
+      const frequencySelect = routineForm.querySelector('[name="frequency"]');
+      const weekSelect = routineForm.querySelector('[name="week"]');
+      const dueDateInput = routineForm.querySelector('[name="due_date"]');
+      const startMonthInput = routineForm.querySelector('[name="start_month"]');
+      const endMonthInput = routineForm.querySelector('[name="end_month"]');
+      const quarterSelect = routineForm.querySelector('[name="quarter"]');
+      const monthSelect = routineForm.querySelector('[name="month"]');
+      const halfSelect = routineForm.querySelector('[name="half_year"]');
+      const taskKindSelect = routineForm.querySelector('[name="task_kind"]');
+      const titleInput = routineForm.querySelector('[name="title"]');
+      const statusSelect = routineForm.querySelector('[name="status"]');
+      const creationStatusLabel = statusSelect?.closest("label");
+      const summaryInput = routineForm.querySelector('[name="summary"]');
+      startMonthInput?.addEventListener("change", () => {
+        applyHalfFromStartMonth(startMonthInput.value);
+      });
+      quarterSelect?.addEventListener("change", () => {
+        applyHalfFromQuarter(quarterSelect.value);
+      });
+      const creationAssigneeList = document.getElementById("creation-assignee-list");
+      const userBadge = document.getElementById("user-badge");
+      function syncRegistrantToCurrentUser() {
+        if (!registrantInput) {
+          return;
+        }
+        if (registrantInput.value) {
+          return;
+        }
+        if (currentLoginName) {
+          registrantInput.value = currentLoginName;
+        }
+      }
+
+      const parentEditOverlay = document.getElementById("parent-edit-overlay");
+      const parentEditForm = document.getElementById("parent-edit-form");
+      const parentEditMessage = document.getElementById("parent-edit-message");
+      const routineEditOverlay = document.getElementById("routine-edit-overlay");
+      const routineEditForm = document.getElementById("routine-edit-form");
+      const routineEditMessage = document.getElementById("routine-edit-message");
+      const routineEditAssigneeList = document.getElementById("routine-edit-assignee-list");
+      const routineEditTitleInput = routineEditForm.querySelector('[name="title"]');
+      const routineEditYearInput = routineEditForm.querySelector('[name="edit_year"]');
+      const routineEditHalfSelect = routineEditForm.querySelector('[name="edit_half_year"]');
+      const routineEditQuarterSelect = routineEditForm.querySelector('[name="edit_quarter"]');
+      const routineEditMonthSelect = routineEditForm.querySelector('[name="edit_month"]');
+      const routineEditWeekSelect = routineEditForm.querySelector('[name="edit_week"]');
+      const routineModal = document.getElementById("routine-modal");
+      const routineModalClose = document.getElementById("routine-modal-close");
+      const routineModalEdit = document.getElementById("routine-modal-edit");
+      const routineEditAssigneeHiddenInput = routineEditForm.querySelector('[name="assignee"]');
+      const creationAssigneeManager = createAssigneeManager({
+        listEl: creationAssigneeList,
+        pickerEl: creationAssigneeSelect,
+        hiddenInput: assigneeHiddenInput,
+        validator: (value) =>
+          value === ALL_EMPLOYEES_LABEL ||
+          organizationUserNames.has(value) ||
+          employeeOnlyUserNames.has(value),
+        onChange: syncRegistrantToCurrentUser,
+      });
+      const routineEditAssigneeManager = createAssigneeManager({
+        listEl: routineEditAssigneeList,
+        pickerEl: routineEditAssigneeSelect,
+        hiddenInput: routineEditAssigneeHiddenInput,
+        validator: (value) =>
+          value === ALL_EMPLOYEES_LABEL ||
+          organizationUserNames.has(value) ||
+          employeeOnlyUserNames.has(value),
+      });
+
+      const parentPaginationPrev = document.getElementById("parent-page-prev");
+      const parentPaginationNext = document.getElementById("parent-page-next");
+      const parentPageLabel = document.getElementById("parent-page-label");
+      const routinePaginationPrev = document.getElementById("routine-page-prev");
+      const routinePaginationNext = document.getElementById("routine-page-next");
+      const routinePageLabel = document.getElementById("routine-page-label");
+      const parentKindTabButtons = Array.from(
+        document.querySelectorAll(".parent-kind-tabs [data-kind-filter]")
+      );
+      const routineKindTabButtons = Array.from(
+        document.querySelectorAll(".routine-kind-tabs [data-routine-kind-filter]")
+      );
+
+      let parentCache = [];
+      let routineCache = [];
+      let selectedParentId = null;
+      let selectedParent = null;
+      let editingParentId = null;
+      let editingParentOriginalAssignee = "";
+      let parentPage = 1;
+      const parentPageSize = 20;
+      let parentHasNext = false;
+      let parentHasPrev = false;
+      let parentKindFilter = "all";
+      let routinePage = 1;
+      const routinePageSize = 20;
+      let routineHasNext = false;
+      let routineHasPrev = false;
+      let routineKindFilter = "all";
+      const parentSortColumns = [
+        null,
+        "task_no",
+        "task_kind",
+        "title",
+        "frequency",
+        "start_month",
+        "end_month",
+        "assignee",
+        "registrant",
+        "status",
+        "summary",
+      ];
+      const routineSortColumns = [
+        null,
+        "task_no",
+        "routine_no",
+        "title",
+        "year",
+        "half_year",
+        "quarter",
+        "month",
+        "week_num",
+        "due_date",
+        "assignee",
+        "registrant",
+        "status",
+        "summary",
+      ];
+      const numericSortColumns = new Set([
+        "task_no",
+        "routine_no",
+        "year",
+        "half_year",
+        "quarter",
+        "month",
+        "week_num",
+      ]);
+      let parentSortState = { key: null, dir: "asc" };
+      let routineSortState = { key: null, dir: "asc" };
+
+      const frequencyLabels = {
+        スポット: "スポット",
+        週次: "週次",
+        月次: "月次",
+        四半期: "四半期",
+        年次: "年次",
+        weekly: "週次",
+        monthly: "月次",
+        quarterly: "四半期",
+        yearly: "年次",
+      };
+      const statusLabels = {
+        未着手: "未着手",
+        着手: "着手",
+        完了: "完了",
+        pending: "未着手",
+        in_progress: "着手",
+        completed: "完了",
+      };
+      const screenNames = {
+        parents: "親タスク一覧",
+        routines: "ルーチン一覧",
+      };
+
+      function setStatus(_) {
+        // ステータス表示は不要にしたため noop
+      }
+
+      function escapeHtml(value) {
+        if (value === undefined || value === null) {
+          return "";
+        }
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#x27;");
+      }
+
+      function formatFrequency(value) {
+        if (!value) {
+          return "";
+        }
+        return frequencyLabels[value] || value;
+      }
+
+      function formatStatus(value) {
+        if (!value) {
+          return "";
+        }
+        return statusLabels[value] || value;
+      }
+
+      function splitAssignees(value) {
+        if (!value) {
+          return [];
+        }
+        return value
+          .split(";")
+          .map((item) => item.trim())
+          .filter(Boolean);
+      }
+
+      function normalizeTaskKind(value) {
+        if (value === "グループ" || value === "group" || value === "Group") {
+          return "グループ";
+        }
+        if (value === "個人" || value === "individual" || value === "Individual") {
+          return "個人";
+        }
+        return "";
+      }
+
+      function resolveTaskKind(item) {
+        const normalized = normalizeTaskKind(item?.task_kind);
+        if (normalized) {
+          return normalized;
+        }
+        const assignees = item?.assignees || splitAssignees(item?.assignee || "");
+        return assignees.length > 1 ? "グループ" : "個人";
+      }
+
+      function createAssigneeManager({ listEl, pickerEl, hiddenInput, validator, onChange }) {
+        const listNode = listEl;
+        const pickerNode = pickerEl;
+        const hiddenNode = hiddenInput;
+        let entries = [];
+
+        function syncHidden() {
+          if (hiddenNode) {
+            hiddenNode.value = entries.join("; ");
+          }
+        }
+
+        function render() {
+          if (!listNode) {
+            syncHidden();
+            return;
+          }
+          listNode.innerHTML = entries
+            .map((name, index) => {
+              const safeName = escapeHtml(name);
+              const ariaLabel = escapeHtml(`${name}を削除`);
+              return `
+              <span class="assignee-chip">
+                <span
+                  class="assignee-chip__label"
+                  role="button"
+                  tabindex="0"
+                  data-remove-assignee="${index}"
+                  aria-label="${ariaLabel}"
+                >
+                  ${safeName}
+                </span>
+              </span>`;
+            })
+            .join("");
+          syncHidden();
+          if (typeof onChange === "function") {
+            onChange();
+          }
+        }
+
+        function setAssignees(list) {
+          entries = Array.isArray(list)
+            ? Array.from(
+                new Set(
+                  list
+                    .map((name) => (name || "").trim())
+                    .filter(Boolean)
+                    .filter((name) => (validator ? validator(name) : true))
+                )
+              )
+            : [];
+          render();
+        }
+
+        function addEntry(value) {
+          const trimmed = (value || "").trim();
+          if (!trimmed) {
+            return;
+          }
+          if (validator && !validator(trimmed)) {
+            return;
+          }
+          if (!entries.includes(trimmed)) {
+            entries.push(trimmed);
+            render();
+          } else {
+            syncHidden();
+          }
+          if (pickerNode) {
+            pickerNode.value = "";
+            pickerNode.focus();
+          }
+        }
+
+        function removeEntry(index) {
+          if (Number.isNaN(index)) {
+            return;
+          }
+          entries.splice(index, 1);
+          render();
+        }
+
+        if (pickerNode) {
+          pickerNode.addEventListener("change", () => {
+            const value = pickerNode.value;
+            if (value === ALL_EMPLOYEES_LABEL) {
+              employeeOnlyCandidateNames.forEach((name) => addEntry(name));
+            } else {
+              addEntry(value);
+            }
+            pickerNode.value = "";
+          });
+          pickerNode.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              addEntry(pickerNode.value);
+            }
+          });
+        }
+        if (listNode) {
+          listNode.addEventListener("click", (event) => {
+            const removeTrigger = event.target.closest("[data-remove-assignee]");
+            if (!removeTrigger) {
+              return;
+            }
+            removeEntry(Number(removeTrigger.dataset.removeAssignee));
+          });
+          listNode.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter" && event.key !== " ") {
+              return;
+            }
+            const removeTrigger = event.target.closest("[data-remove-assignee]");
+            if (!removeTrigger) {
+              return;
+            }
+            event.preventDefault();
+            removeEntry(Number(removeTrigger.dataset.removeAssignee));
+          });
+        }
+
+        return {
+          setAssignees,
+          getAssignees: () => [...entries],
+          clear: () => {
+            entries = [];
+            render();
+          },
+        };
+      }
+
+      const assigneePickers = [creationAssigneeSelect, routineEditAssigneeSelect];
+
+      function filterEmployeeRecord(employee) {
+        const deptCode =
+          (employee.DepartmentCD ||
+            employee.departmentCD ||
+            employee.department_cd ||
+            employee.departmentCode ||
+            ""
+          )
+            .toString()
+            .trim();
+        const retirementDate =
+          employee.RetirementDate ||
+          employee.retirement_date ||
+          employee.retirementDate ||
+          "";
+        const lastWorkDate =
+          employee.LastWorkDate ||
+          employee.lastWorkDate ||
+          employee.last_work_date ||
+          "";
+        const matchesDepartment = !currentDepartmentCD || deptCode === currentDepartmentCD;
+        return matchesDepartment && !retirementDate && !lastWorkDate;
+      }
+
+      function getEmployeeDisplayName(employee) {
+        return (
+          employee.EmployeeName || employee.employee_name || employee.name || ""
+        )
+          .toString()
+          .trim();
+      }
+
+      function populateAssigneePickers(names) {
+        assigneePickers.forEach((picker) => {
+          if (!picker) {
+            return;
+          }
+          const optionNodes = [
+            "<option value=\"\">担当者を追加</option>",
+          ];
+          optionNodes.push(
+            ...names.map((name) => `<option value="${name}">${name}</option>`)
+          );
+          optionNodes.push(
+            `<option value="${ALL_EMPLOYEES_LABEL}">${ALL_EMPLOYEES_LABEL}</option>`
+          );
+          picker.innerHTML = optionNodes.join("");
+        });
+      }
+
+      function refreshEmployeeOptions() {
+        const filtered = fetchedOrganizationEmployees.filter(filterEmployeeRecord);
+        const baseNames = Array.from(
+          new Set(
+            filtered
+              .map((employee) => getEmployeeDisplayName(employee))
+              .filter(Boolean)
+          )
+        ).sort((a, b) => a.localeCompare(b));
+        organizationUserNames.clear();
+        baseNames.forEach((name) => organizationUserNames.add(name));
+        employeeOnlyUserNames.clear();
+        employeeOnlyCandidateNames.forEach((name) => employeeOnlyUserNames.add(name));
+        populateAssigneePickers(baseNames);
+        updateRoutineFilterAssigneeOptions();
+      }
+
+      async function loadOrganizationUsers() {
+        try {
+          const response = await fetch(employeesEndpoint, { cache: "no-store" });
+          if (!response.ok) {
+            return;
+          }
+          const payload = await response.json();
+          fetchedOrganizationEmployees = Array.isArray(payload.employees)
+            ? payload.employees
+            : [];
+          const employeeOnlyRecords = Array.isArray(payload.employees_only)
+            ? payload.employees_only
+            : [];
+          employeeOnlyCandidateNames = Array.from(
+            new Set(
+              employeeOnlyRecords
+                .map((employee) => getEmployeeDisplayName(employee))
+                .filter(Boolean)
+            )
+          ).sort((a, b) => a.localeCompare(b));
+          refreshEmployeeOptions();
+        } catch (_) {
+          // ignore
+        }
+      }
+
+      function getInitialScreenFromUrl() {
+        const queryScreen = new URLSearchParams(location.search).get("screen");
+        if (queryScreen && screens[queryScreen]) {
+          return queryScreen;
+        }
+        const hashScreen = (location.hash || "").replace(/^#/, "");
+        if (hashScreen && screens[hashScreen]) {
+          return hashScreen;
+        }
+        return null;
+      }
+
+      function updateScreenUrl(name) {
+        const url = new URL(location.href);
+        url.searchParams.set("screen", name);
+        url.hash = name;
+        history.replaceState(null, "", url);
+      }
+
+      function showScreen(name, options = {}) {
+        const { updateUrl = true } = options;
+        Object.entries(screens).forEach(([key, el]) => {
+          el.classList.toggle("hidden", key !== name);
+        });
+        if (document.body) {
+          document.body.classList.toggle("screen-routines", name === "routines");
+        }
+        screenButtons.forEach((btn) => {
+          const isCurrent = btn.dataset.screen === name;
+          btn.classList.toggle("active", isCurrent);
+          btn.hidden = false;
+          btn.disabled = isCurrent;
+        });
+        openCreateBtn.hidden = name !== "parents";
+        if (pageTitle) {
+          pageTitle.textContent = "\u30bf\u30b9\u30af\u7ba1\u7406\u30c4\u30fc\u30eb";
+        }
+        if (updateUrl) {
+          updateScreenUrl(name);
+        }
+      }
+
+      function toggleOverlay(element, show) {
+        element.classList.toggle("hidden", !show);
+      }
+
+async function fetchParents(filters = {}) {
+        setStatus("親タスクを取得中…");
+        try {
+          const url = new URL(parentsEndpoint);
+          Object.entries(filters).forEach(([key, value]) => {
+            if (value) {
+              url.searchParams.set(key, value);
+            }
+          });
+          if (parentKindFilter && parentKindFilter !== "all") {
+            url.searchParams.set("task_kind", parentKindFilter);
+          }
+          url.searchParams.set("page", parentPage);
+          url.searchParams.set("page_size", parentPageSize);
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error(`APIエラー ${response.status}`);
+          }
+          const payload = await response.json();
+          parentCache = payload.parents || [];
+          renderParents(parentCache);
+          updateParentPaginationControls(payload.pagination || {});
+          setStatus("");
+        } catch (error) {
+          setStatus(`親タスク取得に失敗しました: ${error.message}`);
+          parentTableBody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:#64748b; padding:16px;">取得に失敗しました</td></tr>`;
+        }
+      }
+
+async function fetchRoutines() {
+        setStatus("ルーチン一覧を取得中…");
+        try {
+          const routinesUrl = new URL(routinesEndpoint);
+          if (routineKindFilter && routineKindFilter !== "all") {
+            routinesUrl.searchParams.set("task_kind", routineKindFilter);
+          }
+          routinesUrl.searchParams.set("page", routinePage);
+          routinesUrl.searchParams.set("page_size", routinePageSize);
+          const response = await fetch(routinesUrl, { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error(`APIエラー ${response.status}`);
+          }
+          const payload = await response.json();
+          routineCache = payload.routines || [];
+          renderRoutines(routineCache);
+          updateRoutinePaginationControls(payload.pagination || {});
+          setStatus("");
+        } catch (error) {
+          setStatus(`ルーチン取得に失敗しました: ${error.message}`);
+          routineTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#64748b; padding:16px;">取得に失敗しました</td></tr>`;
+        }
+      }
+
+function renderParents(parents) {
+        parentTableBody.innerHTML = "";
+        const sortedParents = sortByState(parents, parentSortState);
+        if (!sortedParents.length) {
+          parentTableBody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:#64748b; padding:16px;">該当データがありません</td></tr>`;
+          return;
+        }
+        sortedParents.forEach((parent) => {
+          const taskKindLabel = resolveTaskKind(parent);
+          const row = document.createElement("tr");
+          row.dataset.taskNo = parent.task_no;
+          row.innerHTML = `
+            <td class="complete-cell">
+              <input type="checkbox" class="parent-complete-checkbox" data-task-no="${parent.task_no}" style="display:block; margin:0;" />
+            </td>
+            <td>
+              <button type="button" class="link-button parent-edit-trigger" data-task-no="${parent.task_no}">
+                ${escapeHtml(parent.task_no)}
+              </button>
+            </td>
+            <td>${escapeHtml(taskKindLabel)}</td>
+            <td>${escapeHtml(parent.title)}</td>
+            <td>${escapeHtml(formatFrequency(parent.frequency))}</td>
+            <td>${escapeHtml(parent.start_month)}</td>
+            <td>${escapeHtml(parent.end_month)}</td>
+            <td>${escapeHtml(parent.assignee)}</td>
+            <td>${escapeHtml(parent.registrant || "")}</td>
+            <td>${escapeHtml(formatStatus(parent.status))}</td>
+            <td>${escapeHtml(parent.summary || "")}</td>
+          `;
+          row.classList.toggle("selected-row", parent.task_no === selectedParentId);
+          row.addEventListener("click", (event) => {
+            if (event.target.closest(".parent-complete-checkbox")) {
+              return;
+            }
+            selectParent(parent, { jumpToRoutines: true });
+          });
+          const editTrigger = row.querySelector(".parent-edit-trigger");
+          if (editTrigger) {
+            editTrigger.addEventListener("click", (event) => {
+              event.stopPropagation();
+              openParentEditor(parent);
+            });
+          }
+          parentTableBody.appendChild(row);
+        });
+      }
+
+      function updateParentPaginationControls(pagination = {}) {
+        parentPage = pagination.page || parentPage;
+        parentHasPrev = pagination.has_prev ?? parentPage > 1;
+        parentHasNext = pagination.has_next ?? false;
+        if (parentPageLabel) {
+          parentPageLabel.textContent = `ページ ${parentPage}`;
+        }
+        if (parentPaginationPrev) {
+          parentPaginationPrev.disabled = !parentHasPrev;
+        }
+        if (parentPaginationNext) {
+          parentPaginationNext.disabled = !parentHasNext;
+        }
+      }
+
+      function applyParentKindTabState() {
+        parentKindTabButtons.forEach((button) => {
+          button.classList.toggle("active", button.dataset.kindFilter === parentKindFilter);
+        });
+      }
+
+      function applyRoutineKindTabState() {
+        routineKindTabButtons.forEach((button) => {
+          button.classList.toggle("active", button.dataset.routineKindFilter === routineKindFilter);
+        });
+      }
+
+      function updateRoutinePaginationControls(pagination = {}) {
+        routinePage = pagination.page || routinePage;
+        routineHasPrev = pagination.has_prev ?? routinePage > 1;
+        routineHasNext = pagination.has_next ?? false;
+        if (routinePageLabel) {
+          routinePageLabel.textContent = `ページ ${routinePage}`;
+        }
+        if (routinePaginationPrev) {
+          routinePaginationPrev.disabled = !routineHasPrev;
+        }
+        if (routinePaginationNext) {
+          routinePaginationNext.disabled = !routineHasNext;
+        }
+      }
+
+      function isDueTodayOrOverdue(item) {
+        if (!item?.due_date) {
+          return false;
+        }
+        const due = new Date(item.due_date);
+        if (Number.isNaN(due.getTime())) {
+          return false;
+        }
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        due.setHours(0, 0, 0, 0);
+        return due.getTime() <= today.getTime();
+      }
+
+      function compareSortValues(left, right, sortKey, sortDir) {
+        const direction = sortDir === "desc" ? -1 : 1;
+        if (sortKey === "due_date") {
+          const leftTime = left ? new Date(left).getTime() : Number.MAX_SAFE_INTEGER;
+          const rightTime = right ? new Date(right).getTime() : Number.MAX_SAFE_INTEGER;
+          const safeLeft = Number.isFinite(leftTime) ? leftTime : Number.MAX_SAFE_INTEGER;
+          const safeRight = Number.isFinite(rightTime) ? rightTime : Number.MAX_SAFE_INTEGER;
+          if (safeLeft === safeRight) {
+            return 0;
+          }
+          return safeLeft < safeRight ? -direction : direction;
+        }
+        if (numericSortColumns.has(sortKey)) {
+          const leftNum = Number(left);
+          const rightNum = Number(right);
+          const safeLeft = Number.isFinite(leftNum) ? leftNum : Number.MAX_SAFE_INTEGER;
+          const safeRight = Number.isFinite(rightNum) ? rightNum : Number.MAX_SAFE_INTEGER;
+          if (safeLeft === safeRight) {
+            return 0;
+          }
+          return safeLeft < safeRight ? -direction : direction;
+        }
+        const leftText = left === undefined || left === null ? "" : String(left);
+        const rightText = right === undefined || right === null ? "" : String(right);
+        const compared = leftText.localeCompare(rightText, "ja");
+        if (compared === 0) {
+          return 0;
+        }
+        return compared * direction;
+      }
+
+      function sortByState(list, sortState) {
+        if (!sortState?.key) {
+          return [...list];
+        }
+        return [...list].sort((a, b) => {
+          const primary = compareSortValues(a?.[sortState.key], b?.[sortState.key], sortState.key, sortState.dir);
+          if (primary !== 0) {
+            return primary;
+          }
+          return compareSortValues(a?.task_no, b?.task_no, "task_no", "asc");
+        });
+      }
+
+      function renderRoutines(routines) {
+        routineTableBody.innerHTML = "";
+        let list = routines;
+        const yearFilter = routineFilterInputs.year?.value?.trim() || "";
+        const monthFilter = routineFilterInputs.month?.value?.trim() || "";
+        const assignee = routineFilterInputs.assignee?.value?.trim() || "";
+        if (selectedParentId) {
+          list = list.filter((item) => item.task_no === selectedParentId);
+        }
+        if (yearFilter) {
+          list = list.filter((item) => {
+            const value = item.year !== undefined && item.year !== null ? String(item.year) : "";
+            return value === yearFilter;
+          });
+        }
+        if (monthFilter) {
+          list = list.filter((item) => {
+            const value =
+              item.month !== undefined && item.month !== null ? String(item.month) : "";
+            return value === monthFilter;
+          });
+        }
+        if (assignee) {
+          list = list.filter(
+            (item) =>
+              (item.assignee && item.assignee.includes(assignee)) ||
+              (item.registrant && item.registrant.includes(assignee))
+            );
+        }
+        const toNumberOrMax = (value) => {
+          const num = Number(value);
+          return Number.isFinite(num) ? num : Number.MAX_SAFE_INTEGER;
+        };
+        const toDateOrMax = (value) => {
+          if (!value) {
+            return Number.MAX_SAFE_INTEGER;
+          }
+          const timestamp = new Date(value).getTime();
+          return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
+        };
+        if (routineSortState.key) {
+          list = sortByState(list, routineSortState);
+        } else {
+          list = [...list].sort((a, b) => {
+            const compareValues = [
+              [toNumberOrMax(a.task_no), toNumberOrMax(b.task_no)],
+              [toNumberOrMax(a.routine_no), toNumberOrMax(b.routine_no)],
+              [toNumberOrMax(a.year), toNumberOrMax(b.year)],
+              [toNumberOrMax(a.half_year), toNumberOrMax(b.half_year)],
+              [toNumberOrMax(a.quarter), toNumberOrMax(b.quarter)],
+              [toNumberOrMax(a.month), toNumberOrMax(b.month)],
+              [toNumberOrMax(a.week_num), toNumberOrMax(b.week_num)],
+              [toDateOrMax(a.due_date), toDateOrMax(b.due_date)],
+            ];
+            for (const [left, right] of compareValues) {
+              if (left !== right) {
+                return left - right;
+              }
+            }
+            return 0;
+          });
+        }
+        if (!list.length) {
+          routineTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#64748b; padding:16px;">該当データがありません</td></tr>`;
+          return;
+        }
+        list.forEach((routine) => {
+          const row = document.createElement("tr");
+          row.dataset.childNo = routine.record_no;
+          row.classList.toggle("due-alert", isDueTodayOrOverdue(routine));
+          row.innerHTML = `
+            <td class="complete-cell">
+              <input type="checkbox" class="routine-complete-checkbox" data-record-no="${routine.record_no}" style="display:block; margin:0;" />
+            </td>
+            <td>${escapeHtml(routine.task_no)}</td>
+            <td>${escapeHtml(routine.routine_no)}</td>
+            <td>${escapeHtml(routine.title)}</td>
+            <td>${escapeHtml(routine.year)}</td>
+            <td>${escapeHtml(routine.half_year || "")}</td>
+            <td>${escapeHtml(routine.quarter)}</td>
+            <td>${escapeHtml(routine.month)}</td>
+            <td>${escapeHtml(routine.week_num)}</td>
+            <td>${escapeHtml(routine.due_date ? new Date(routine.due_date).toLocaleDateString() : "")}</td>
+            <td>${escapeHtml(routine.assignee)}</td>
+            <td>${escapeHtml(routine.registrant || "")}</td>
+            <td>${escapeHtml(formatStatus(routine.status))}</td>
+            <td>${escapeHtml(routine.summary)}</td>
+          `;
+          row.addEventListener("click", (event) => {
+            if (event.target.closest(".routine-complete-checkbox")) {
+              return;
+            }
+            openRoutineEditor(routine);
+          });
+          routineTableBody.appendChild(row);
+        });
+      }
+
+      function toggleSortState(sortState, key) {
+        if (!key) {
+          return;
+        }
+        if (sortState.key === key) {
+          sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+          return;
+        }
+        sortState.key = key;
+        sortState.dir = "asc";
+      }
+
+      function initializeTableHeaderSort() {
+        const bindHeaderSort = (selector, columns, sortState, rerender) => {
+          const headers = Array.from(document.querySelectorAll(selector));
+          headers.forEach((header, index) => {
+            const key = columns[index];
+            if (!key) {
+              return;
+            }
+            header.classList.add("sortable");
+            header.addEventListener("click", () => {
+              toggleSortState(sortState, key);
+              rerender();
+            });
+          });
+        };
+        bindHeaderSort("#parent-table thead th", parentSortColumns, parentSortState, () =>
+          renderParents(parentCache)
+        );
+        bindHeaderSort("#routine-table thead th", routineSortColumns, routineSortState, () =>
+          renderRoutines(routineCache)
+        );
+      }
+
+      function updateParentSelectionUI() {
+        parentTableBody.querySelectorAll("tr").forEach((row) => {
+          row.classList.toggle("selected-row", Number(row.dataset.taskNo) === selectedParentId);
+        });
+      }
+
+      function selectParent(parent, options = {}) {
+        selectedParentId = parent ? parent.task_no : null;
+        selectedParent = parent;
+        updateParentSelectionUI();
+        if (options.jumpToRoutines) {
+          showScreen("routines");
+        }
+        renderRoutines(routineCache);
+      }
+
+      function openParentEditor(parent) {
+        setCreationMode(parent);
+        fillCreationForm(parent);
+        formMessage.textContent = "";
+        toggleOverlay(creationOverlay, true);
+      }
+
+      function renderRoutineModalList(list) {
+        routineModalBody.innerHTML = "";
+        if (!list.length) {
+          routineModalBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#64748b; padding:12px;">紐づくルーチンがありません</td></tr>`;
+          return;
+        }
+        list.forEach((routine) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td><input type="checkbox" class="routine-complete-checkbox" data-record-no="${routine.record_no}" /></td>
+            <td>${escapeHtml(routine.routine_no)}</td>
+            <td>${escapeHtml(routine.due_date ? new Date(routine.due_date).toLocaleDateString() : "")}</td>
+            <td>${escapeHtml(formatStatus(routine.status))}</td>
+            <td>${escapeHtml(routine.summary)}</td>
+          `;
+          routineModalBody.appendChild(row);
+        });
+      }
+
+      function openRoutineModal(parent) {
+        selectParent(parent);
+        const list = routineCache.filter((item) => item.task_no === parent.task_no);
+        renderRoutineModalList(list);
+        routineModal.classList.remove("hidden");
+      }
+      if (routineModalClose) {
+        routineModalClose.addEventListener("click", () => {
+          routineModal.classList.add("hidden");
+        });
+      }
+      if (routineModal) {
+        routineModal.addEventListener("click", (event) => {
+          if (event.target === routineModal) {
+            routineModal.classList.add("hidden");
+          }
+        });
+      }
+      if (routineModalEdit) {
+        routineModalEdit.addEventListener("click", () => {
+          if (!selectedParent) {
+            return;
+          }
+          openParentEditor(selectedParent);
+          routineModal.classList.add("hidden");
+        });
+      }
+
+      async function loadAssignee() {
+        try {
+          const response = await fetch(currentUserEndpoint, { cache: "no-store" });
+          if (!response.ok) {
+            return;
+          }
+          const payload = await response.json();
+          currentDepartmentCD =
+            (payload.department_cd || payload.departmentCD || payload.departmentCode || "")
+              .toString()
+              .trim();
+          const loginName = payload.employee_name || payload.name;
+          if (loginName) {
+            currentLoginName = loginName;
+            creationAssigneeManager?.setAssignees([loginName]);
+            syncRegistrantToCurrentUser();
+            if (userBadge) {
+              const nameSpan = userBadge.querySelector(".username");
+              const orgSpan = userBadge.querySelector(".organization");
+              if (nameSpan) {
+                nameSpan.textContent = `ログイン：${loginName}`;
+              }
+              const departmentText = payload.department_name || payload.department_cd || "所属組織なし";
+              if (orgSpan) {
+                orgSpan.textContent = `組織：${departmentText}`;
+              }
+            }
+          }
+          refreshEmployeeOptions();
+        } catch (error) {
+          // Ignore failures for now.
+        }
+      }
+
+      function openRoutineEditor(routine) {
+        const syncRoutineEditDerivedFields = () => {
+          const yearNum = Number(routineEditYearInput?.value);
+          const monthNum = Number(routineEditMonthSelect?.value);
+          const weekNum = Number(routineEditWeekSelect?.value);
+          if (!Number.isFinite(yearNum) || yearNum < 1900 || yearNum > 2200) {
+            return;
+          }
+          if (!Number.isFinite(monthNum) || monthNum < 1 || monthNum > 12) {
+            return;
+          }
+          if (!Number.isFinite(weekNum) || weekNum < 1 || weekNum > 4) {
+            return;
+          }
+          const firstDay = new Date(yearNum, monthNum - 1, 1);
+          const firstWeekday = firstDay.getDay();
+          const delta = (5 - firstWeekday + 7) % 7;
+          let day = 1 + delta + 7 * (weekNum - 1);
+          const lastDay = new Date(yearNum, monthNum, 0).getDate();
+          if (day > lastDay) {
+            day = lastDay;
+          }
+          const due = new Date(yearNum, monthNum - 1, day);
+          const yyyy = due.getFullYear();
+          const mm = String(due.getMonth() + 1).padStart(2, "0");
+          const dd = String(due.getDate()).padStart(2, "0");
+          routineEditForm.due_date.value = `${yyyy}-${mm}-${dd}`;
+        };
+        const syncRoutineEditHalfQuarterFromMonth = () => {
+          const monthNum = Number(routineEditMonthSelect?.value);
+          if (!Number.isFinite(monthNum) || monthNum < 1 || monthNum > 12) {
+            return;
+          }
+          if (routineEditQuarterSelect) {
+            routineEditQuarterSelect.value = String(Math.ceil(monthNum / 3));
+          }
+          if (routineEditHalfSelect) {
+            routineEditHalfSelect.value = monthNum <= 6 ? "1" : "2";
+          }
+        };
+        const syncRoutineEditFromDueDate = () => {
+          const due = routineEditForm.due_date.value ? new Date(routineEditForm.due_date.value) : null;
+          if (!due || Number.isNaN(due.getTime())) {
+            return;
+          }
+          const yearNum = due.getFullYear();
+          const monthNum = due.getMonth() + 1;
+          const weekNum = Math.floor((due.getDate() - 1) / 7) + 1;
+          if (routineEditYearInput) {
+            routineEditYearInput.value = String(yearNum);
+          }
+          if (routineEditMonthSelect) {
+            routineEditMonthSelect.value = String(monthNum);
+          }
+          if (routineEditWeekSelect) {
+            routineEditWeekSelect.value = String(Math.min(Math.max(weekNum, 1), 4));
+          }
+          if (routineEditQuarterSelect) {
+            routineEditQuarterSelect.value = String(Math.ceil(monthNum / 3));
+          }
+          if (routineEditHalfSelect) {
+            routineEditHalfSelect.value = monthNum <= 6 ? "1" : "2";
+          }
+        };
+        if (!routineEditForm.dataset.boundCalendarEditors) {
+          routineEditForm.dataset.boundCalendarEditors = "1";
+          routineEditYearInput?.addEventListener("change", syncRoutineEditDerivedFields);
+          routineEditMonthSelect?.addEventListener("change", () => {
+            syncRoutineEditHalfQuarterFromMonth();
+            syncRoutineEditDerivedFields();
+          });
+          routineEditWeekSelect?.addEventListener("change", syncRoutineEditDerivedFields);
+          routineEditQuarterSelect?.addEventListener("change", () => {
+            const quarterNum = Number(routineEditQuarterSelect.value);
+            if (!Number.isFinite(quarterNum) || quarterNum < 1 || quarterNum > 4) {
+              return;
+            }
+            if (routineEditHalfSelect) {
+              routineEditHalfSelect.value = quarterNum <= 2 ? "1" : "2";
+            }
+            if (routineEditMonthSelect) {
+              const currentMonth = Number(routineEditMonthSelect.value);
+              const minMonth = (quarterNum - 1) * 3 + 1;
+              const maxMonth = minMonth + 2;
+              if (!Number.isFinite(currentMonth) || currentMonth < minMonth || currentMonth > maxMonth) {
+                routineEditMonthSelect.value = String(minMonth);
+              }
+            }
+            syncRoutineEditDerivedFields();
+          });
+          routineEditHalfSelect?.addEventListener("change", () => {
+            const halfNum = Number(routineEditHalfSelect.value);
+            if (!Number.isFinite(halfNum) || (halfNum !== 1 && halfNum !== 2)) {
+              return;
+            }
+            if (routineEditQuarterSelect) {
+              const q = Number(routineEditQuarterSelect.value);
+              if (!Number.isFinite(q) || (halfNum === 1 && q > 2) || (halfNum === 2 && q < 3)) {
+                routineEditQuarterSelect.value = halfNum === 1 ? "1" : "3";
+              }
+            }
+            syncRoutineEditDerivedFields();
+          });
+          routineEditForm.due_date?.addEventListener("change", syncRoutineEditFromDueDate);
+        }
+        routineEditForm.record_no.value = routine.record_no;
+        routineEditForm.due_date.value = routine.due_date || "";
+        if (routineEditTitleInput) {
+          routineEditTitleInput.value = routine.title || "";
+        }
+        if (routineEditYearInput) {
+          routineEditYearInput.value = routine.year ? String(routine.year) : "";
+        }
+        if (routineEditHalfSelect) {
+          routineEditHalfSelect.value = routine.half_year ? String(routine.half_year) : "";
+        }
+        if (routineEditQuarterSelect) {
+          routineEditQuarterSelect.value = routine.quarter ? String(routine.quarter) : "";
+        }
+        if (routineEditMonthSelect) {
+          routineEditMonthSelect.value = routine.month ? String(routine.month) : "";
+        }
+        if (routineEditWeekSelect) {
+          routineEditWeekSelect.value = routine.week_num ? String(routine.week_num) : "";
+        }
+        if (routine.due_date) {
+          syncRoutineEditFromDueDate();
+        } else {
+          syncRoutineEditHalfQuarterFromMonth();
+          syncRoutineEditDerivedFields();
+        }
+        routineEditForm.status.value = routine.status;
+        routineEditForm.summary.value = routine.summary || "";
+        routineEditorParentId = routine.task_no;
+        routineEditAssigneeManager?.setAssignees(
+          routine.assignees || splitAssignees(routine.assignee)
+        );
+        routineEditMessage.textContent = "";
+        toggleOverlay(routineEditOverlay, true);
+      }
+
+        parentEditForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          if (!window.confirm("内容をルーチン一覧にも反映させます。よろしいですか？")) {
+            return;
+          }
+          const taskNo = Number(parentEditForm.task_no.value);
+          try {
+            await fetch(parentUpdate(taskNo), {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                status: parentEditForm.status.value,
+                summary: parentEditForm.summary.value,
+              }),
+            });
+            parentEditMessage.textContent = "更新しました。";
+            await Promise.all([fetchParents(), fetchRoutines()]);
+            toggleOverlay(parentEditOverlay, false);
+          } catch (error) {
+            parentEditMessage.textContent = "更新に失敗しました。";
+          }
+        });
+
+      routineEditForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const recordNo = Number(routineEditForm.record_no.value);
+        const editYear = Number(routineEditYearInput?.value);
+        const editMonth = Number(routineEditMonthSelect?.value);
+        const editWeek = Number(routineEditWeekSelect?.value);
+        if (
+          Number.isFinite(editYear) &&
+          Number.isFinite(editMonth) &&
+          Number.isFinite(editWeek) &&
+          editYear >= 1900 &&
+          editYear <= 2200 &&
+          editMonth >= 1 &&
+          editMonth <= 12 &&
+          editWeek >= 1 &&
+          editWeek <= 4
+        ) {
+          const firstDay = new Date(editYear, editMonth - 1, 1);
+          const delta = (5 - firstDay.getDay() + 7) % 7;
+          let day = 1 + delta + 7 * (editWeek - 1);
+          const lastDay = new Date(editYear, editMonth, 0).getDate();
+          if (day > lastDay) {
+            day = lastDay;
+          }
+          const computed = new Date(editYear, editMonth - 1, day);
+          const yyyy = computed.getFullYear();
+          const mm = String(computed.getMonth() + 1).padStart(2, "0");
+          const dd = String(computed.getDate()).padStart(2, "0");
+          routineEditForm.due_date.value = `${yyyy}-${mm}-${dd}`;
+        }
+        try {
+          await fetch(routineUpdate(recordNo), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              due_date: routineEditForm.due_date.value || null,
+              title: routineEditTitleInput?.value,
+              assignee: routineEditAssigneeManager?.getAssignees(),
+              status: routineEditForm.status.value,
+              summary: routineEditForm.summary.value,
+              registrant: currentLoginName,
+            }),
+          });
+          routineEditMessage.textContent = "\u66f4\u65b0\u3057\u307e\u3057\u305f\u3002";
+          await Promise.all([fetchParents(), fetchRoutines()]);
+          toggleOverlay(routineEditOverlay, false);
+        } catch (error) {
+          routineEditMessage.textContent = "\u66f4\u65b0\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002";
+        }
+      });
+
+      frequencySelect.addEventListener("change", updateFrequencyControls);
+
+      routineForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const taskNoInput = routineForm.querySelector('[name="task_no"]');
+        const taskNoFromForm = Number(taskNoInput?.value || "");
+        const updateTargetTaskNo =
+          Number.isFinite(taskNoFromForm) && taskNoFromForm > 0
+            ? taskNoFromForm
+            : editingParentId;
+        const selectedAssignees = creationAssigneeManager?.getAssignees() || [];
+        if (!selectedAssignees.length) {
+          formMessage.textContent = "担当者を1名以上選択してください。";
+          return;
+        }
+        const selectedTaskKind = (taskKindSelect?.value || "").trim();
+        if (selectedTaskKind === "\u30b0\u30eb\u30fc\u30d7" && selectedAssignees.length < 2) {
+          formMessage.textContent = "\u30bf\u30b9\u30af\u533a\u5206\u304c\u30b0\u30eb\u30fc\u30d7\u306e\u5834\u5408\u3001\u62c5\u5f53\u8005\u306f2\u540d\u4ee5\u4e0a\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044\u3002";
+          return;
+        }
+        let applyAssigneeToRoutines = true;
+        if (updateTargetTaskNo) {
+          const currentAssigneeText = selectedAssignees.join("; ");
+          if (editingParentOriginalAssignee !== currentAssigneeText) {
+            applyAssigneeToRoutines = window.confirm(
+              "\u62c5\u5f53\u8005\u306e\u5909\u66f4\u3092\u3059\u3079\u3066\u306e\u30eb\u30fc\u30c1\u30f3\u306b\u53cd\u6620\u3055\u305b\u307e\u3059\u304b\uff1f\nOK: \u53cd\u6620\u3055\u305b\u308b\n\u30ad\u30e3\u30f3\u30bb\u30eb: \u53cd\u6620\u3055\u305b\u306a\u3044"
+            );
+          } else if (!window.confirm("\u5909\u66f4\u3092\u4fdd\u5b58\u3057\u307e\u3059\u304b\uff1f")) {
+            routineForm.reset();
+            setDefaultFormValues();
+            toggleOverlay(creationOverlay, false);
+            setCreationMode();
+            return;
+          }
+        } else if (!window.confirm("\u30bf\u30b9\u30af\u3092\u767b\u9332\u3057\u307e\u3059\u304b\uff1f")) {
+          routineForm.reset();
+          setDefaultFormValues();
+          toggleOverlay(creationOverlay, false);
+          setCreationMode();
+          return;
+        }
+        formMessage.textContent = "";
+        const formData = new FormData(routineForm);
+        const quarterRaw = formData.get("quarter");
+        const quarterNum = Number(quarterRaw);
+        const halfFromQuarter =
+          Number.isFinite(quarterNum) && quarterNum >= 1 && quarterNum <= 4
+            ? (quarterNum <= 2 ? 1 : 2)
+            : null;
+        const payload = {
+          start_month: formData.get("start_month"),
+          end_month: formData.get("end_month"),
+          frequency: formData.get("frequency"),
+          half_year: halfFromQuarter ?? (Number(formData.get("half_year")) || null),
+          quarter: formData.get("quarter") || null,
+          month: formData.get("month") || null,
+          week_num: Number(formData.get("week")) || null,
+          week: formData.get("week"),
+          due_date: formData.get("due_date") || null,
+          title: formData.get("title"),
+          assignee: creationAssigneeManager?.getAssignees(),
+          task_kind: formData.get("task_kind") || null,
+          registrant: registrantInput?.value || currentLoginName,
+          status: "未着手",
+          summary: formData.get("summary"),
+        };
+        try {
+          if (updateTargetTaskNo) {
+            const response = await fetch(parentUpdate(updateTargetTaskNo), {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                frequency: payload.frequency,
+                half_year: payload.half_year,
+                due_date: payload.due_date,
+                start_month: payload.start_month,
+                end_month: payload.end_month,
+                year: payload.start_month ? Number(payload.start_month.slice(0, 4)) : undefined,
+                quarter: payload.quarter,
+                month: payload.month ? Number(payload.month) : null,
+                week_num: payload.week_num,
+                assignee: payload.assignee,
+                apply_assignee_to_routines: applyAssigneeToRoutines,
+                task_kind: payload.task_kind,
+                title: payload.title,
+                summary: payload.summary,
+              }),
+            });
+            if (!response.ok) {
+              const error = await response.json().catch(() => ({}));
+              throw new Error(error.message || "更新処理に失敗しました");
+            }
+            formMessage.textContent = "更新しました。";
+            setCreationMode();
+            routineForm.reset();
+            setDefaultFormValues();
+            toggleOverlay(creationOverlay, false);
+            await loadAssignee();
+            await Promise.all([fetchParents(), fetchRoutines()]);
+            return;
+          }
+          const response = await fetch(routinesEndpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...payload,
+              details: [{ status: payload.status || "未着手" }],
+            }),
+          });
+          if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || "登録処理に失敗しました");
+          }
+          formMessage.textContent = "登録しました。";
+          routineForm.reset();
+          setDefaultFormValues();
+          toggleOverlay(creationOverlay, false);
+          await loadAssignee();
+          await Promise.all([fetchParents(), fetchRoutines()]);
+        } catch (error) {
+          formMessage.textContent = `エラー: ${error.message}`;
+        }
+      });
+
+      const frequencyRules = {
+        スポット: {
+          half: false,
+          quarter: false,
+          month: false,
+          week: false,
+          start: false,
+          end: false,
+          due: true,
+          dueReq: true,
+        },
+        週次: {
+          half: false,
+          quarter: false,
+          month: false,
+          week: false,
+          start: true,
+          end: true,
+          due: false,
+        },
+        月次: {
+          half: false,
+          quarter: false,
+          month: false,
+          week: true,
+          start: true,
+          end: true,
+          due: false,
+        },
+        四半期: {
+          half: false,
+          quarter: false,
+          month: true,
+          week: true,
+          start: true,
+          end: true,
+          due: false,
+        },
+        半期: {
+          half: false,
+          quarter: false,
+          month: true,
+          week: true,
+          start: true,
+          end: true,
+          due: false,
+        },
+        年次: {
+          half: false,
+          quarter: false,
+          month: true,
+          week: true,
+          start: true,
+          end: true,
+          due: false,
+        },
+      };
+      function setControl(input, enabled, required = false) {
+        if (enabled) {
+          input.disabled = false;
+          input.removeAttribute("disabled");
+        } else {
+          input.disabled = true;
+          input.setAttribute("disabled", "disabled");
+          if (input.tagName === "SELECT" || input.tagName === "INPUT") {
+            input.value = "";
+          }
+        }
+        input.required = enabled && required;
+      }
+
+      function applyHalfFromStartMonth(startValue) {
+        if (!halfSelect || !startValue) {
+          return;
+        }
+        const parts = startValue.split("-");
+        if (parts.length !== 2) {
+          return;
+        }
+        const monthNum = Number(parts[1]);
+        if (!Number.isFinite(monthNum) || monthNum < 1 || monthNum > 12) {
+          return;
+        }
+        const halfValue = monthNum <= 6 ? "1" : "2";
+        if (!halfSelect.disabled) {
+          halfSelect.value = halfValue;
+        }
+      }
+      function applyHalfFromQuarter(quarterValue) {
+        if (!halfSelect) {
+          return;
+        }
+        const quarterNum = Number(quarterValue);
+        if (!Number.isFinite(quarterNum) || quarterNum < 1 || quarterNum > 4) {
+          return;
+        }
+        if (!halfSelect.disabled) {
+          halfSelect.value = quarterNum <= 2 ? "1" : "2";
+        }
+      }
+      function applyParentEditFieldLock(isParentEdit) {
+        if (frequencySelect) {
+          frequencySelect.disabled = isParentEdit;
+        }
+        if (startMonthInput) {
+          startMonthInput.disabled = isParentEdit;
+        }
+        if (endMonthInput) {
+          endMonthInput.disabled = isParentEdit;
+        }
+        if (registrantInput) {
+          registrantInput.disabled = isParentEdit;
+        }
+        if (creationStatusLabel) {
+          creationStatusLabel.style.display = isParentEdit ? "none" : "";
+        }
+      }
+      function setCreationMode(parent = null) {
+        const nextTaskNo = parent ? Number(parent.task_no) : null;
+        editingParentId = Number.isFinite(nextTaskNo) && nextTaskNo > 0 ? nextTaskNo : null;
+        editingParentOriginalAssignee = "";
+        const taskNoInput = routineForm?.querySelector('[name="task_no"]');
+        if (taskNoInput) {
+          taskNoInput.value = editingParentId ? String(editingParentId) : "";
+        }
+        applyParentEditFieldLock(Boolean(parent));
+        creationTitle.textContent = parent ? "\u89aa\u30bf\u30b9\u30af\u7de8\u96c6" : "\u30bf\u30b9\u30af\u4f5c\u6210";
+      }
+      function fillCreationForm(parent) {
+        setDefaultFormValues();
+        frequencySelect.value = parent.frequency || "週次";
+        updateFrequencyControls();
+        halfSelect.value = parent.half_year ? String(parent.half_year) : "";
+        quarterSelect.value = parent.quarter || "";
+        monthSelect.value = parent.month ? String(parent.month) : "";
+        weekSelect.value = parent.week_num ? String(parent.week_num) : "";
+        startMonthInput.value = parent.start_month || "";
+        if (halfSelect) {
+          applyHalfFromStartMonth(startMonthInput.value);
+        }
+        if (quarterSelect?.value) {
+          applyHalfFromQuarter(quarterSelect.value);
+        }
+        endMonthInput.value = parent.end_month || "";
+        dueDateInput.value = parent.due_date ? parent.due_date.slice(0, 10) : "";
+        titleInput.value = parent.title || "";
+        if (statusSelect) {
+          statusSelect.value = parent.status || "未着手";
+        }
+        summaryInput.value = parent.summary || "";
+        const parentAssignees = parent.assignees || splitAssignees(parent.assignee);
+        editingParentOriginalAssignee = parentAssignees.join("; ");
+        creationAssigneeManager?.setAssignees(parentAssignees);
+        if (taskKindSelect) {
+          taskKindSelect.value = resolveTaskKind(parent);
+        }
+        if (registrantInput) {
+          registrantInput.value = parent.registrant || currentLoginName;
+        }
+        applyParentEditFieldLock(Boolean(parent));
+      }
+      function updateFrequencyControls() {
+        const value = frequencySelect.value;
+        const config = frequencyRules[value] || frequencyRules["週次"];
+        setControl(halfSelect, config.half, config.half);
+        setControl(quarterSelect, config.quarter, config.quarter);
+        setControl(monthSelect, config.month, config.month);
+        setControl(weekSelect, config.week, config.week);
+        setControl(startMonthInput, config.start, config.start);
+        setControl(endMonthInput, config.end, config.end);
+        dueDateInput.disabled = !config.due;
+        if (!config.due) {
+          dueDateInput.value = "";
+          dueDateInput.removeAttribute("required");
+        } else {
+          dueDateInput.required = !!config.dueReq;
+        }
+        if (config.half && halfSelect) {
+          halfSelect.value = "1";
+        }
+        if (config.quarter && quarterSelect && !quarterSelect.value) {
+          quarterSelect.value = "1";
+        }
+        if (value === "半期" && halfSelect) {
+          halfSelect.value = "1";
+        }
+        updateMonthOptionsForFrequency(value);
+        if (config.month && monthSelect && !monthSelect.value) {
+          monthSelect.value = "1";
+        }
+        if (config.week && weekSelect && !weekSelect.value) {
+          weekSelect.value = "1";
+        }
+      }
+
+      function updateMonthOptionsForFrequency(frequencyValue) {
+        if (!monthSelect) {
+          return;
+        }
+        const previousValue = monthSelect.value;
+        const isHalf =
+          frequencyValue === "半期" ||
+          frequencyValue === "half-year" ||
+          frequencyValue === "halfyear";
+        const isQuarter =
+          frequencyValue === "四半期" ||
+          frequencyValue === "quarterly" ||
+          frequencyValue === "quarter";
+        const max = isHalf ? 6 : isQuarter ? 3 : 12;
+        const optionNodes = [];
+        const shouldShowAuto = !(isQuarter || isHalf);
+        if (shouldShowAuto) {
+          optionNodes.push("<option value=\"\">-</option>");
+        }
+        optionNodes.push(
+          ...Array.from({ length: max }, (_, idx) => {
+            const value = idx + 1;
+            return `<option value=\"${value}\">${value}</option>`;
+          })
+        );
+        monthSelect.innerHTML = optionNodes.join("");
+        const numericValue = Number(previousValue);
+        if (
+          previousValue &&
+          !Number.isNaN(numericValue) &&
+          numericValue >= 1 &&
+          numericValue <= max
+        ) {
+          monthSelect.value = previousValue;
+        } else {
+          monthSelect.value = "";
+        }
+      }
+
+      function setDefaultFormValues() {
+        const now = new Date();
+        const startValue = new Date(now.getFullYear(), now.getMonth(), 1)
+          .toISOString()
+          .slice(0, 7);
+        startMonthInput.value = startValue;
+        const endDate = new Date(now);
+        endDate.setFullYear(endDate.getFullYear() + 1);
+        endMonthInput.value = endDate.toISOString().slice(0, 7);
+        weekSelect.value = "1";
+        frequencySelect.value = "";
+        if (quarterSelect) {
+          const monthForQuarter = Number(startValue.slice(5));
+          quarterSelect.value = Math.ceil(monthForQuarter / 3).toString();
+        }
+        if (monthSelect) {
+          monthSelect.value = String(Number(startValue.slice(5)));
+        }
+        if (halfSelect) {
+          applyHalfFromStartMonth(startValue);
+        }
+        if (taskKindSelect) {
+          taskKindSelect.value = "個人";
+        }
+        routineForm.querySelector('[name="summary"]').value = "";
+        creationAssigneeManager?.clear();
+        if (currentLoginName) {
+          creationAssigneeManager?.setAssignees([currentLoginName]);
+        }
+        syncRegistrantToCurrentUser();
+        formMessage.textContent = "";
+        updateFrequencyControls();
+      }
+
+
+      routineFilterBtn.addEventListener("click", () => renderRoutines(routineCache));
+      routineClearBtn.addEventListener("click", () => {
+        selectParent(null);
+        setRoutineFilterDefaults();
+        renderRoutines(routineCache);
+      });
+
+      parentPaginationPrev?.addEventListener("click", () => {
+        if (parentHasPrev) {
+          parentPage = Math.max(1, parentPage - 1);
+          fetchParents();
+        }
+      });
+      parentPaginationNext?.addEventListener("click", () => {
+        if (parentHasNext) {
+          parentPage += 1;
+          fetchParents();
+        }
+      });
+      parentKindTabButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const nextFilter = button.dataset.kindFilter || "all";
+          if (nextFilter === parentKindFilter) {
+            return;
+          }
+          parentKindFilter = nextFilter;
+          parentPage = 1;
+          applyParentKindTabState();
+          fetchParents();
+        });
+      });
+      routineKindTabButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const nextFilter = button.dataset.routineKindFilter || "all";
+          if (nextFilter === routineKindFilter) {
+            return;
+          }
+          routineKindFilter = nextFilter;
+          routinePage = 1;
+          applyRoutineKindTabState();
+          fetchRoutines();
+        });
+      });
+      routinePaginationPrev?.addEventListener("click", () => {
+        if (routineHasPrev) {
+          routinePage = Math.max(1, routinePage - 1);
+          fetchRoutines();
+        }
+      });
+      routinePaginationNext?.addEventListener("click", () => {
+        if (routineHasNext) {
+          routinePage += 1;
+          fetchRoutines();
+        }
+      });
+
+      function hideOverlay(overlay) {
+        overlay.classList.add("hidden");
+        if (overlay === routineEditOverlay) {
+          routineEditorParentId = null;
+          routineEditAssigneeManager?.clear();
+        }
+      }
+      [creationOverlay, parentEditOverlay, routineEditOverlay].forEach((overlay) => {
+        overlay.addEventListener("click", (event) => {
+          if (event.target === overlay) {
+            hideOverlay(overlay);
+          }
+        });
+      });
+      document.querySelectorAll("[data-close]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const target = document.getElementById(btn.dataset.close);
+          if (target) {
+            hideOverlay(target);
+          }
+        });
+      });
+
+      screenButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          if (button.dataset.screen === "routines") {
+            selectParent(null);
+          }
+          showScreen(button.dataset.screen);
+        });
+      });
+      openCreateBtn.addEventListener("click", () => {
+        setCreationMode();
+        setDefaultFormValues();
+        loadAssignee();
+        formMessage.textContent = "";
+        toggleOverlay(creationOverlay, true);
+      });
+      cancelBtn.addEventListener("click", () => {
+        routineForm.reset();
+        setCreationMode();
+        setDefaultFormValues();
+        toggleOverlay(creationOverlay, false);
+      });
+      window.addEventListener("hashchange", () => {
+        const initialScreen = getInitialScreenFromUrl();
+        if (initialScreen) {
+          showScreen(initialScreen, { updateUrl: false });
+        }
+      });
+      window.addEventListener("DOMContentLoaded", () => {
+        const initialScreen = getInitialScreenFromUrl() || "routines";
+        showScreen(initialScreen, { updateUrl: false });
+        initializeTableHeaderSort();
+        setDefaultFormValues();
+        buildRoutineFilterYearOptions();
+        buildRoutineFilterMonthOptions();
+        setRoutineFilterDefaults();
+        updateRoutineFilterAssigneeOptions();
+        applyParentKindTabState();
+        applyRoutineKindTabState();
+        fetchParents();
+        fetchRoutines();
+        loadOrganizationUsers()
+          .catch(() => {})
+          .finally(() => loadAssignee());
+      });
+    })();
+  </script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const panel = document.getElementById("creation-overlay");
+      const openBtn = document.getElementById("open-create-btn");
+      const closeBtn = document.getElementById("cancel-create");
+      const toggle = (show) => panel?.classList.toggle("hidden", !show);
+      openBtn?.addEventListener("click", () => toggle(true));
+      closeBtn?.addEventListener("click", () => toggle(false));
+    });
+  </script>
+</body>
+</html>
