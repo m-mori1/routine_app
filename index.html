@@ -23,16 +23,25 @@
     .app-shell {
       max-width: 1600px;
       margin: 0 auto;
-      padding: 24px 8px 48px;
+      padding: 16px 8px 48px;
     }
     header {
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
     header h1 {
       margin: 0;
-      font-size: 1.65rem;
+      font-size: 1.3rem;
       font-weight: 800;
       letter-spacing: -0.5px;
+      line-height: 1.2;
+      text-align: center;
+    }
+    .screen-indicator {
+      margin: 4px 0 10px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #1e3a8a;
+      padding-left: 1em;
     }
     .tab-line {
       display: flex;
@@ -128,6 +137,8 @@
       display: flex;
       gap: 8px;
       margin-bottom: 10px;
+      margin-left: 0;
+      padding-left: 0;
     }
     .parent-kind-tabs button,
     .routine-kind-tabs button {
@@ -135,9 +146,11 @@
       background: #fff;
       color: #1f2933;
       border-radius: 6px;
-      padding: 4px 12px;
+      padding: 6px 14px;
+      min-height: 30px;
       cursor: pointer;
       font-size: 0.85rem;
+      line-height: 1.2;
     }
     .parent-kind-tabs button.active,
     .routine-kind-tabs button.active {
@@ -249,9 +262,9 @@
       cursor: pointer;
     }
     #parent-table td:first-child {
-      width: 28px;
-      min-width: 28px;
-      max-width: 28px;
+      width: 20px;
+      min-width: 20px;
+      max-width: 20px;
       padding: 0;
       text-align: center;
       white-space: nowrap;
@@ -265,9 +278,9 @@
       white-space: nowrap;
     }
     #parent-table th:first-child {
-      width: 28px;
-      min-width: 28px;
-      max-width: 28px;
+      width: 20px;
+      min-width: 20px;
+      max-width: 20px;
       white-space: nowrap;
       text-align: center;
       padding: 4px 2px;
@@ -282,49 +295,108 @@
     #parent-table td.complete-cell,
     #routine-table td.complete-cell {
       display: table-cell;
-      padding-left: 4px !important;
-      padding-right: 4px !important;
-      text-align: center !important;
-      position: relative;
-    }
-    #parent-table td.complete-cell {
       padding: 0 !important;
+      text-align: center !important;
+      vertical-align: middle !important;
+      position: static;
+      overflow: hidden;
+    }
+    .complete-cell-inner {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
     }
     #parent-table .parent-complete-checkbox {
       width: 14px;
       height: 14px;
+      min-width: 0 !important;
       margin: 0;
       appearance: auto;
     }
     #routine-table .routine-complete-checkbox {
       width: 16px;
       height: 16px;
+      min-width: 0 !important;
       margin: 0;
       appearance: auto;
     }
     #parent-table td.complete-cell .parent-complete-checkbox,
     #routine-table td.complete-cell .routine-complete-checkbox {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      margin: 0 !important;
-    }
-    #routine-table td.complete-cell .routine-complete-checkbox {
-      float: none;
+      position: static;
+      transform: none;
+      display: block;
+      margin: 0 auto !important;
     }
     #parent-table th:nth-child(2),
     #parent-table td:nth-child(2) {
-      width: 20px;
-      min-width: 20px;
-      max-width: 20px;
+      width: 6ch;
+      min-width: 6ch;
+      max-width: 6ch;
       white-space: nowrap;
+      text-align: center;
     }
     #routine-table th:nth-child(2),
     #routine-table td:nth-child(2) {
-      width: 72px;
-      min-width: 72px;
-      max-width: 72px;
+      width: 6ch;
+      min-width: 6ch;
+      max-width: 6ch;
+      white-space: nowrap;
+      text-align: center;
+    }
+    #routine-table th:nth-child(3),
+    #routine-table td:nth-child(3) {
+      width: 4ch;
+      min-width: 4ch;
+      max-width: 4ch;
+      white-space: nowrap;
+      text-align: center;
+    }
+    #parent-table th:nth-child(9),
+    #parent-table td:nth-child(9),
+    #routine-table th:nth-child(12),
+    #routine-table td:nth-child(12) {
+      width: 8ch;
+      min-width: 8ch;
+      max-width: 8ch;
+    }
+    #parent-table th:nth-child(10),
+    #parent-table td:nth-child(10),
+    #routine-table th:nth-child(13),
+    #routine-table td:nth-child(13) {
+      width: 6em;
+      min-width: 6em;
+      max-width: 6em;
+      white-space: nowrap;
+    }
+    #parent-table th:nth-child(4),
+    #parent-table td:nth-child(4),
+    #routine-table th:nth-child(4),
+    #routine-table td:nth-child(4) {
+      width: 19ch;
+      min-width: 19ch;
+      max-width: 19ch;
+    }
+    #parent-table th:nth-child(6),
+    #parent-table td:nth-child(6),
+    #parent-table th:nth-child(7),
+    #parent-table td:nth-child(7) {
+      width: 7ch;
+      min-width: 7ch;
+      max-width: 7ch;
+      white-space: nowrap;
+      text-align: center;
+    }
+    #parent-table th:nth-child(8),
+    #parent-table td:nth-child(8),
+    #routine-table th:nth-child(11),
+    #routine-table td:nth-child(11) {
+      width: 20ch;
+      min-width: 20ch;
+      max-width: 20ch;
+    }
+    #routine-table th:nth-child(12),
+    #routine-table td:nth-child(12) {
       white-space: nowrap;
     }
     #routine-table td:nth-child(5),
@@ -343,11 +415,6 @@
     #routine-table th:nth-child(10) {
       white-space: nowrap;
     }
-    #parent-table td:nth-child(2) {
-      text-align: right;
-    }
-    #routine-table td:nth-child(2),
-    #routine-table td:nth-child(3),
     #routine-table td:nth-child(5),
     #routine-table td:nth-child(6),
     #routine-table td:nth-child(7),
@@ -357,7 +424,145 @@
     }
     #routine-table td:nth-child(14),
     #routine-table th:nth-child(14) {
-      min-width: 280px;
+      width: 16ch;
+      min-width: 16ch;
+      max-width: 16ch;
+    }
+    /* Routine table width overrides */
+    #routine-table td:first-child,
+    #routine-table th:first-child {
+      width: 20px !important;
+      min-width: 20px !important;
+      max-width: 20px !important;
+    }
+    #routine-table th:nth-child(2),
+    #routine-table td:nth-child(2) {
+      width: 4ch !important;
+      min-width: 4ch !important;
+      max-width: 4ch !important;
+      text-align: center;
+    }
+    #routine-table th:nth-child(3),
+    #routine-table td:nth-child(3) {
+      width: 4ch !important;
+      min-width: 4ch !important;
+      max-width: 4ch !important;
+      text-align: center;
+    }
+    #routine-table th:nth-child(4),
+    #routine-table td:nth-child(4) {
+      width: 25ch !important;
+      min-width: 25ch !important;
+      max-width: 25ch !important;
+    }
+    #routine-table th:nth-child(5),
+    #routine-table td:nth-child(5),
+    #routine-table th:nth-child(6),
+    #routine-table td:nth-child(6),
+    #routine-table th:nth-child(7),
+    #routine-table td:nth-child(7),
+    #routine-table th:nth-child(8),
+    #routine-table td:nth-child(8),
+    #routine-table th:nth-child(9),
+    #routine-table td:nth-child(9) {
+      width: 4ch !important;
+      min-width: 4ch !important;
+      max-width: 4ch !important;
+      white-space: nowrap;
+      text-align: center;
+    }
+    #routine-table th:nth-child(10),
+    #routine-table td:nth-child(10) {
+      width: 6ch !important;
+      min-width: 6ch !important;
+      max-width: 6ch !important;
+    }
+    #routine-table th:nth-child(11),
+    #routine-table td:nth-child(11) {
+      width: 20ch !important;
+      min-width: 20ch !important;
+      max-width: 20ch !important;
+    }
+    #routine-table th:nth-child(12),
+    #routine-table td:nth-child(12),
+    #routine-table th:nth-child(13),
+    #routine-table td:nth-child(13) {
+      width: 5ch !important;
+      min-width: 5ch !important;
+      max-width: 5ch !important;
+    }
+    #routine-table th:nth-child(14),
+    #routine-table td:nth-child(14) {
+      width: 16ch !important;
+      min-width: 16ch !important;
+      max-width: 16ch !important;
+    }
+    /* Parent table width overrides */
+    #parent-table th:nth-child(2),
+    #parent-table td:nth-child(2) {
+      width: 4ch;
+      min-width: 4ch;
+      max-width: 4ch;
+      white-space: nowrap;
+      text-align: center;
+    }
+    #parent-table th:nth-child(3),
+    #parent-table td:nth-child(3) {
+      width: 6ch;
+      min-width: 6ch;
+      max-width: 6ch;
+      white-space: nowrap;
+      text-align: center;
+    }
+    #parent-table th:nth-child(4),
+    #parent-table td:nth-child(4) {
+      width: 25ch;
+      min-width: 25ch;
+      max-width: 25ch;
+    }
+    #parent-table th:nth-child(5),
+    #parent-table td:nth-child(5) {
+      width: 5ch;
+      min-width: 5ch;
+      max-width: 5ch;
+      white-space: nowrap;
+      text-align: center;
+    }
+    #parent-table th:nth-child(6),
+    #parent-table td:nth-child(6),
+    #parent-table th:nth-child(7),
+    #parent-table td:nth-child(7) {
+      width: 5ch;
+      min-width: 5ch;
+      max-width: 5ch;
+      white-space: nowrap;
+      text-align: center;
+    }
+    #parent-table th:nth-child(8),
+    #parent-table td:nth-child(8) {
+      width: 20ch;
+      min-width: 20ch;
+      max-width: 20ch;
+    }
+    #parent-table th:nth-child(9),
+    #parent-table td:nth-child(9) {
+      width: 5ch;
+      min-width: 5ch;
+      max-width: 5ch;
+      white-space: nowrap;
+    }
+    #parent-table th:nth-child(10),
+    #parent-table td:nth-child(10) {
+      width: 5ch;
+      min-width: 5ch;
+      max-width: 5ch;
+      white-space: nowrap;
+    }
+    #parent-table th:nth-child(11),
+    #parent-table td:nth-child(11) {
+      width: 16ch;
+      min-width: 16ch;
+      max-width: 16ch;
     }
     #routine-modal-table tbody tr:last-child td {
       border-bottom: none;
@@ -613,8 +818,11 @@
       color: #fff;
     }
     .form-actions button.secondary {
-      background: #e2e8f0;
-      color: #1f2933;
+      background: #64748b;
+      color: #ffffff;
+    }
+    .form-actions button.secondary:hover {
+      background: #475569;
     }
     .form-message {
       font-size: 0.75rem;
@@ -815,6 +1023,25 @@
       color: var(--accent-ink);
       letter-spacing: 0.02em;
     }
+    #routine-table thead tr > th,
+    #parent-table thead tr > th {
+      text-align: center !important;
+      vertical-align: middle !important;
+    }
+    /* Force-center specific routine columns */
+    #routine-table th:nth-child(1),
+    #routine-table td:nth-child(1),
+    #routine-table th:nth-child(3),
+    #routine-table td:nth-child(3),
+    #routine-table th:nth-child(7),
+    #routine-table td:nth-child(7),
+    #routine-table th:nth-child(13),
+    #routine-table td:nth-child(13) {
+      text-align: center !important;
+      vertical-align: middle !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
     .theme-modern .tab-buttons button,
     .theme-modern .tab-controls button,
     .theme-modern .filters button {
@@ -839,6 +1066,13 @@
       color: var(--accent-ink);
       background: #ffffff;
     }
+    .theme-modern .parent-kind-tabs,
+    .theme-modern .routine-kind-tabs {
+      padding-left: 12px;
+    }
+    .theme-modern.screen-routines .tab-buttons {
+      margin-left: 0;
+    }
     .theme-modern .parent-kind-tabs button.active,
     .theme-modern .routine-kind-tabs button.active {
       background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 100%);
@@ -852,6 +1086,13 @@
     .theme-modern .form-actions button.primary,
     .theme-modern .routine-modal-actions #routine-modal-edit {
       background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 100%);
+    }
+    .theme-modern .form-actions button.secondary {
+      background: #4b5563;
+      border-color: transparent;
+    }
+    .theme-modern .form-actions button.secondary:hover {
+      background: #374151;
     }
     .theme-modern.screen-routines .tab-controls button,
     .theme-modern.screen-routines .filters button,
@@ -882,8 +1123,9 @@
 <body class="theme-modern">
   <div class="app-shell">
     <header>
-      <h1 id="page-title">親タスク一覧</h1>
+      <h1 id="page-title">タスク管理ツール</h1>
     </header>
+    <div class="screen-indicator" id="screen-indicator" aria-live="polite">親タスク一覧</div>
     <div class="tab-line">
       <div class="tab-controls">
         <button id="open-create-btn" type="button">タスク作成</button>
@@ -908,10 +1150,10 @@
       <div class="table-wrapper">
         <table id="parent-table">
             <colgroup>
-              <col style="width:28px;" />
               <col style="width:20px;" />
-              <col style="width:5ch;" />
-              <col style="width:19ch;" />
+              <col style="width:4ch;" />
+              <col style="width:6ch;" />
+              <col style="width:25ch;" />
               <col style="width:5ch;" />
               <col style="width:5ch;" />
               <col style="width:5ch;" />
@@ -923,7 +1165,7 @@
           <thead>
             <tr>
               <th>完了</th>
-              <th>親No</th>
+              <th>タスク</th>
               <th>タスク区分</th>
               <th>タイトル</th>
               <th>頻度</th>
@@ -971,24 +1213,24 @@
       <div class="table-wrapper">
         <table id="routine-table">
           <colgroup>
-            <col style="width:56px;" />
-            <col style="width:72px;" />
-            <col style="width:12ch;" />
-            <col style="width:36ch;" />
-            <col style="width:7ch;" />
-            <col style="width:7ch;" />
-            <col style="width:7ch;" />
+            <col style="width:20px;" />
+            <col style="width:4ch;" />
+            <col style="width:4ch;" />
+            <col style="width:25ch;" />
+            <col style="width:4ch;" />
+            <col style="width:4ch;" />
+            <col style="width:4ch;" />
+            <col style="width:4ch;" />
+            <col style="width:4ch;" />
             <col style="width:6ch;" />
-            <col style="width:6ch;" />
-            <col style="width:10ch;" />
-            <col style="width:30ch;" />
-            <col style="width:16ch;" />
-            <col style="width:16ch;" />
             <col style="width:20ch;" />
+            <col style="width:5ch;" />
+            <col style="width:5ch;" />
+            <col style="width:16ch;" />
           </colgroup>
           <thead>
             <tr>
-              <th aria-label="完了" style="width:56px;">完了</th>
+              <th aria-label="完了" style="width:20px;">完了</th>
               <th>タスク</th>
               <th>ルーチン</th>
               <th>タイトル</th>
@@ -1355,7 +1597,11 @@
         }
         try {
           setStatus("完了処理を実行しています…");
-          const response = await fetch(parentCompleteEndpoint(taskNo), { method: "POST" });
+          const response = await fetch(parentCompleteEndpoint(taskNo), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+          });
           if (!response.ok) {
             throw new Error("完了処理に失敗しました");
           }
@@ -1381,7 +1627,11 @@
           checkbox.disabled = false;
           return;
         }
-        return fetch(routineCompleteEndpoint(recordNo), { method: "POST" })
+        return fetch(routineCompleteEndpoint(recordNo), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        })
           .then((response) => {
             if (!response.ok) {
               throw new Error("完了処理に失敗しました");
@@ -1414,6 +1664,7 @@
         routines: document.getElementById("routine-screen"),
       };
       const pageTitle = document.getElementById("page-title");
+      const screenIndicator = document.getElementById("screen-indicator");
       const routineFilterInputs = {
         year: document.querySelector("[name='filter-routine-year']"),
         month: document.querySelector("[name='filter-routine-month']"),
@@ -1638,12 +1889,14 @@
         yearly: "年次",
       };
       const statusLabels = {
+        未対応: "未着手",
         未着手: "未着手",
         着手: "着手",
         完了: "完了",
         pending: "未着手",
         in_progress: "着手",
         completed: "完了",
+        "??": "完了",
       };
       const screenNames = {
         parents: "親タスク一覧",
@@ -1972,6 +2225,9 @@
         if (pageTitle) {
           pageTitle.textContent = "\u30bf\u30b9\u30af\u7ba1\u7406\u30c4\u30fc\u30eb";
         }
+        if (screenIndicator) {
+          screenIndicator.textContent = `${screenNames[name] || name}`;
+        }
         if (updateUrl) {
           updateScreenUrl(name);
         }
@@ -2047,7 +2303,9 @@ function renderParents(parents) {
           row.dataset.taskNo = parent.task_no;
           row.innerHTML = `
             <td class="complete-cell">
-              <input type="checkbox" class="parent-complete-checkbox" data-task-no="${parent.task_no}" style="display:block; margin:0;" />
+              <div class="complete-cell-inner">
+                <input type="checkbox" class="parent-complete-checkbox" data-task-no="${parent.task_no}" />
+              </div>
             </td>
             <td>
               <button type="button" class="link-button parent-edit-trigger" data-task-no="${parent.task_no}">
@@ -2245,7 +2503,7 @@ function renderParents(parents) {
           });
         }
         if (!list.length) {
-          routineTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#64748b; padding:16px;">該当データがありません</td></tr>`;
+          routineTableBody.innerHTML = `<tr><td colspan="14" style="text-align:center; color:#64748b; padding:16px;">該当データがありません</td></tr>`;
           return;
         }
         list.forEach((routine) => {
@@ -2254,7 +2512,9 @@ function renderParents(parents) {
           row.classList.toggle("due-alert", isDueTodayOrOverdue(routine));
           row.innerHTML = `
             <td class="complete-cell">
-              <input type="checkbox" class="routine-complete-checkbox" data-record-no="${routine.record_no}" style="display:block; margin:0;" />
+              <div class="complete-cell-inner">
+                <input type="checkbox" class="routine-complete-checkbox" data-record-no="${routine.record_no}" />
+              </div>
             </td>
             <td>${escapeHtml(routine.task_no)}</td>
             <td>${escapeHtml(routine.routine_no)}</td>

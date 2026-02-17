@@ -1,0 +1,14 @@
+﻿{
+  "name": "routine_app-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Playwright E2E tests for routine_app",
+  "scripts": {
+    "e2e:test": "playwright test",
+    "e2e:test:headed": "playwright test --headed",
+    "e2e:test:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
+  }
+}

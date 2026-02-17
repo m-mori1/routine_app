@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 import calendar
 import os
 import sys
@@ -14,7 +14,7 @@ from db_config import get_connection_string
 
 BASE_DIR = Path(__file__).resolve().parent
 base_dir = BASE_DIR
-load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR / ".env", override=True)
 
 ACCOUNT_SCHEMA = os.environ.get("ACCOUNT_SCHEMA", "")
 ACCOUNT_DATABASE = os.environ.get("ACCOUNT_DATABASE", "")
@@ -26,10 +26,17 @@ ENTRA_SCOPES = os.environ.get("ENTRA_SCOPES", "User.Read").split()
 ENTRA_AUTHORITY = f"https://login.microsoftonline.com/{ENTRA_TENANT_ID}" if ENTRA_TENANT_ID else ""
 FALLBACK_DEPARTMENT_CD = os.environ.get("FALLBACK_DEPARTMENT_CD", "D000013")
 FALLBACK_DEPARTMENT_NAME = os.environ.get("FALLBACK_DEPARTMENT_NAME", "システム")
+E2E_AUTH_BYPASS = os.environ.get("ROUTINE_E2E_BYPASS_AUTH", "0") == "1"
+E2E_TEST_UPN = os.environ.get("ROUTINE_E2E_TEST_UPN", "m-mori")
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
 _ROUTINE_CHILD_HAS_ASSIGNEE_COLUMN = None
 _ROUTINE_CHILD_HAS_TITLE_COLUMN = None
+JST = timezone(timedelta(hours=9))
+
+
+def _now_jst_iso():
+    return datetime.now(JST).isoformat(timespec="seconds")
 
 def _get_db_connection():
     return pyodbc.connect(get_connection_string())
@@ -270,6 +277,22 @@ def _format_assignees(value):
     entries = _parse_assignees(value)
     return "; ".join(entries) if entries else None
 
+def _normalize_status(value):
+    normalized = (str(value).strip() if value is not None else "") or "未着手"
+    mapping = {
+        "未対応": "未着手",
+        "未着手": "未着手",
+        "pending": "未着手",
+        "着手": "着手",
+        "処理中": "着手",
+        "進行中": "着手",
+        "in_progress": "着手",
+        "完了": "完了",
+        "completed": "完了",
+        "??": "完了",
+    }
+    return mapping.get(normalized, normalized)
+
 
 def _half_year_from_quarter(quarter_value):
     try:
@@ -345,7 +368,7 @@ def _build_entries(data, registrant, department_cd=None):
             week_num = 1
 
     summary_value = data.get("summary")
-    status_value = data.get("status") or "未着手"
+    status_value = _normalize_status(data.get("status"))
     assignee_value = _format_assignees(data.get("assignee"))
 
     def _create_child(seq, due_date):
@@ -619,6 +642,7 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, task_kind=None):
                     record["month"] = record.get("parent_month")
                     record["week_num"] = record.get("parent_week_num")
                 record["summary"] = record.get("child_summary") or record.get("parent_summary")
+                record["status"] = _normalize_status(record.get("status"))
                 for cleanup_key in (
                     "parent_year",
                     "parent_quarter",
@@ -704,6 +728,7 @@ def _fetch_parent_tasks(filters, page=1, page_size=DEFAULT_PAGE_SIZE):
                 due_date_value = parent.get("due_date")
                 if due_date_value:
                     parent["due_date"] = due_date_value.isoformat()
+                parent["status"] = _normalize_status(parent.get("status"))
                 parent["assignees"] = _parse_assignees(parent.get("assignee"))
                 parents.append(parent)
             return parents, has_next
@@ -746,6 +771,8 @@ def _update_parent(task_no, data):
             if key == "task_kind":
                 value = _normalize_task_kind(value, data.get("assignee"))
                 task_kind_for_validation = value
+            if key == "status":
+                value = _normalize_status(value)
             updates.append(f"{key} = ?")
             params.append(value)
     if "quarter" in data and data.get("quarter") is not None:
@@ -855,6 +882,8 @@ def _update_child(record_no, data):
             value = data[key]
             if key == "assignee":
                 value = _format_assignees(value)
+            if key == "status":
+                value = _normalize_status(value)
             updates.append(f"{key} = ?")
             params.append(value)
     if not updates:
@@ -880,6 +909,7 @@ def _complete_routine(record_no):
         SET is_deleted = 1,
             deleted_at = SYSUTCDATETIME(),
             status = '完了'
+        OUTPUT INSERTED.task_no
         WHERE record_no = ?
           AND is_deleted = 0
     """
@@ -887,8 +917,27 @@ def _complete_routine(record_no):
         with _get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(query, [record_no])
-            if cursor.rowcount == 0:
+            row = cursor.fetchone()
+            if not row:
                 raise RuntimeError("Routine already completed or not found")
+            task_no = row[0]
+            cursor.execute(
+                "SELECT COUNT(*) FROM dbo.routine_task_child WHERE task_no = ? AND is_deleted = 0",
+                [task_no],
+            )
+            remaining = cursor.fetchone()[0]
+            if remaining == 0:
+                cursor.execute(
+                    """
+                    UPDATE dbo.routine_task
+                    SET is_deleted = 1,
+                        deleted_at = SYSUTCDATETIME(),
+                        status = '完了'
+                    WHERE task_no = ?
+                      AND is_deleted = 0
+                    """,
+                    [task_no],
+                )
             conn.commit()
     except pyodbc.Error as exc:
         raise RuntimeError("Failed to complete routine") from exc
@@ -954,16 +1003,27 @@ def create_app():
         }
         if request.endpoint in public_endpoints:
             return
+        if E2E_AUTH_BYPASS:
+            if not session.get("user"):
+                display_name = E2E_TEST_UPN.split("@", 1)[0] if E2E_TEST_UPN else "m-mori"
+                session["user"] = {
+                    "preferred_username": E2E_TEST_UPN,
+                    "name": display_name,
+                    "upn": E2E_TEST_UPN,
+                }
+            return
         if session.get("user"):
             return
         return redirect(url_for("login"))
 
     @app.route("/login")
+    @app.route("/routine_app/login")
     def login():
         session["auth_flow"] = _build_auth_flow()
         return redirect(session["auth_flow"]["auth_uri"])
 
     @app.route("/auth/redirect")
+    @app.route("/routine_app/auth/redirect")
     def auth_redirect():
         flow = session.get("auth_flow")
         if not flow:
@@ -984,6 +1044,7 @@ def create_app():
         return redirect(url_for("serve_index"))
 
     @app.route("/logout")
+    @app.route("/routine_app/logout")
     def logout():
         session.clear()
         return redirect(url_for("login"))
@@ -1000,8 +1061,8 @@ def create_app():
         return {
             "routines": routines,
             "pagination": pagination,
-            "last_updated": datetime.utcnow().isoformat() + "Z",
-            "fetched_at": datetime.utcnow().isoformat() + "Z",
+            "last_updated": _now_jst_iso(),
+            "fetched_at": _now_jst_iso(),
         }
 
     def _handle_create():

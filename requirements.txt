@@ -1,0 +1,5 @@
+﻿Flask
+python-dotenv
+msal
+pyodbc
+wfastcgi
