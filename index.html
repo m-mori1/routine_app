@@ -2295,26 +2295,40 @@ async function fetchParents(filters = {}) {
       }
 
 async function fetchRoutines() {
-        setStatus("ルーチン一覧を取得中…");
+        setStatus("Loading routines...");
         try {
-          const routinesUrl = new URL(routinesEndpoint);
-          if (routineKindFilter && routineKindFilter !== "all") {
-            routinesUrl.searchParams.set("task_kind", routineKindFilter);
-          }
-          routinesUrl.searchParams.set("page", routinePage);
-          routinesUrl.searchParams.set("page_size", routinePageSize);
-          const response = await fetch(routinesUrl, { cache: "no-store" });
-          if (!response.ok) {
-            throw new Error(`APIエラー ${response.status}`);
-          }
-          const payload = await response.json();
-          routineCache = payload.routines || [];
+          const merged = [];
+          const maxFetchPages = 200;
+          let page = 1;
+          let hasNext = false;
+          do {
+            const routinesUrl = new URL(routinesEndpoint);
+            if (routineKindFilter && routineKindFilter !== "all") {
+              routinesUrl.searchParams.set("task_kind", routineKindFilter);
+            }
+            routinesUrl.searchParams.set("page", page);
+            routinesUrl.searchParams.set("page_size", "100");
+            const response = await fetch(routinesUrl, { cache: "no-store" });
+            if (!response.ok) {
+              throw new Error(`API error ${response.status}`);
+            }
+            const payload = await response.json();
+            merged.push(...(payload.routines || []));
+            hasNext = Boolean(payload.pagination?.has_next);
+            page += 1;
+          } while (hasNext && page <= maxFetchPages);
+
+          routineCache = merged;
           renderRoutines(routineCache);
-          updateRoutinePaginationControls(payload.pagination || {});
+          updateRoutinePaginationControls({
+            page: 1,
+            has_prev: false,
+            has_next: false,
+          });
           setStatus("");
         } catch (error) {
-          setStatus(`ルーチン取得に失敗しました: ${error.message}`);
-          routineTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#64748b; padding:16px;">取得に失敗しました</td></tr>`;
+          setStatus(`Failed to load routines: ${error.message}`);
+          routineTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#64748b; padding:16px;">Failed to load</td></tr>`;
         }
       }
 
