@@ -491,6 +491,10 @@
       min-width: 6ch !important;
       max-width: 6ch !important;
     }
+    #routine-table th:nth-child(12),
+    #routine-table td:nth-child(12) {
+      text-align: center;
+    }
     #routine-table th:nth-child(14),
     #routine-table td:nth-child(14) {
       width: 16ch !important;
@@ -550,6 +554,7 @@
       min-width: 6ch;
       max-width: 6ch;
       white-space: nowrap;
+      text-align: center;
     }
     #parent-table th:nth-child(10),
     #parent-table td:nth-child(10) {
@@ -2298,10 +2303,8 @@ async function fetchRoutines() {
         setStatus("Loading routines...");
         try {
           const merged = [];
-          const maxFetchPages = 200;
           let page = 1;
-          let hasNext = false;
-          do {
+          while (true) {
             const routinesUrl = new URL(routinesEndpoint);
             if (routineKindFilter && routineKindFilter !== "all") {
               routinesUrl.searchParams.set("task_kind", routineKindFilter);
@@ -2314,9 +2317,12 @@ async function fetchRoutines() {
             }
             const payload = await response.json();
             merged.push(...(payload.routines || []));
-            hasNext = Boolean(payload.pagination?.has_next);
+            const hasNext = Boolean(payload.pagination?.has_next);
+            if (!hasNext) {
+              break;
+            }
             page += 1;
-          } while (hasNext && page <= maxFetchPages);
+          }
 
           routineCache = merged;
           renderRoutines(routineCache);
@@ -2579,7 +2585,10 @@ function renderParents(parents) {
           if (Number.isNaN(d.getTime())) {
             return "";
           }
-          return `${d.getMonth() + 1}/${d.getDate()}`;
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          const dd = String(d.getDate()).padStart(2, "0");
+          return `${yyyy}/${mm}/${dd}`;
         };
         if (routineSortState.key) {
           list = sortByState(list, routineSortState);
