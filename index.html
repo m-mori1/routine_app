@@ -575,7 +575,7 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    /* Hide status column and move its width to summary (keep table total width) */
+    /* Routine/Parent: hide status column, keep other column widths */
     #parent-table col:nth-child(10),
     #routine-table col:nth-child(13) {
       width: 0 !important;
@@ -593,15 +593,13 @@
       padding: 0 !important;
       border: 0 !important;
     }
-    #parent-table col:nth-child(11),
-    #routine-table col:nth-child(14),
     #parent-table th:nth-child(11),
     #parent-table td:nth-child(11),
     #routine-table th:nth-child(14),
     #routine-table td:nth-child(14) {
-      width: 40ch !important;
-      min-width: 40ch !important;
-      max-width: 40ch !important;
+      width: 33ch !important;
+      min-width: 33ch !important;
+      max-width: 33ch !important;
     }
     #parent-table td:nth-child(4),
     #routine-table td:nth-child(4),
