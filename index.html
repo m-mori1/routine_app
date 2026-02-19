@@ -3406,7 +3406,10 @@ function renderParents(parents) {
       }
 
 
-      routineFilterBtn.addEventListener("click", () => renderRoutines(routineCache));
+      routineFilterBtn.addEventListener("click", () => {
+        selectParent(null);
+        renderRoutines(routineCache);
+      });
       routineClearBtn.addEventListener("click", () => {
         selectParent(null);
         setRoutineFilterDefaults();
