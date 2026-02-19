@@ -585,6 +585,13 @@
     #routine-modal-table tbody tr:last-child td {
       border-bottom: none;
     }
+    /* Hide status columns in list tables */
+    #parent-table th:nth-child(10),
+    #parent-table td:nth-child(10),
+    #routine-table th:nth-child(13),
+    #routine-table td:nth-child(13) {
+      display: none !important;
+    }
     tbody tr:nth-child(even) {
       background: #fbfcfe;
     }
@@ -1908,7 +1915,7 @@
         "week_num",
       ]);
       let parentSortState = { key: null, dir: "asc" };
-      let routineSortState = { key: null, dir: "asc" };
+      let routineSortState = { key: "due_date", dir: "asc" };
 
       const frequencyLabels = {
         スポット: "スポット",
