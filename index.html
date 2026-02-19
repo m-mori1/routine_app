@@ -564,6 +564,12 @@
       min-width: 16ch;
       max-width: 16ch;
     }
+    #parent-table td:nth-child(11),
+    #routine-table td:nth-child(14) {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     #routine-modal-table tbody tr:last-child td {
       border-bottom: none;
     }
@@ -1371,7 +1377,7 @@
           </label>
           <label>
             <span>備考</span>
-            <textarea name="summary"></textarea>
+            <textarea name="summary" maxlength="500"></textarea>
           </label>
         </div>
         <div class="form-actions">
@@ -1401,7 +1407,7 @@
         <div class="form-row second-row">
           <label>
             <span>備考</span>
-            <textarea name="summary"></textarea>
+            <textarea name="summary" maxlength="500"></textarea>
           </label>
         </div>
         <div class="form-actions">
@@ -1505,7 +1511,7 @@
             <div class="form-row two-column summary-actions-row">
               <label>
                 <span>備考</span>
-                <textarea name="summary"></textarea>
+                <textarea name="summary" maxlength="500"></textarea>
               </label>
               <div class="form-actions">
                 <button class="primary" type="submit">更新</button>
