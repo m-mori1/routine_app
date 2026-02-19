@@ -459,23 +459,6 @@ def _build_entries(data, registrant, department_cd=None):
         "summary": summary_value,
     }
 
-    generation_start_year = start_year
-    generation_start_month = start_month
-    if normalized_freq in {"四半期", "quarterly"} and month_value:
-        if month_value < 1 or month_value > 3:
-            month_value = ((month_value - 1) % 3) + 1
-        gen_year = start_year
-        gen_month = month_value
-        while gen_year < start_year or (
-            gen_year == start_year and gen_month < start_month
-        ):
-            gen_month += 3
-            if gen_month > 12:
-                gen_month -= 12
-                gen_year += 1
-        generation_start_year = gen_year
-        generation_start_month = gen_month
-
     step_map = {
         "週次": 1,
         "月次": 1,
@@ -492,6 +475,21 @@ def _build_entries(data, registrant, department_cd=None):
     step = step_map.get(normalized_freq)
     if step is None:
         raise ValueError("unknown frequency")
+
+    generation_start_year = start_year
+    generation_start_month = start_month
+    # For quarter/half-year/yearly, use selected month as generation anchor
+    # and advance by step until it reaches start_month or later.
+    if month_value and step in {3, 6, 12}:
+        normalized_month_value = ((month_value - 1) % step) + 1
+        gen_year = start_year
+        gen_month = normalized_month_value
+        while gen_year < start_year or (
+            gen_year == start_year and gen_month < start_month
+        ):
+            gen_year, gen_month = _next_month(gen_year, gen_month, step)
+        generation_start_year = gen_year
+        generation_start_month = gen_month
 
     months = _generate_months(
         generation_start_year, generation_start_month, end_year, end_month, step

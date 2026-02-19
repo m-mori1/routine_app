@@ -3326,11 +3326,17 @@ function renderParents(parents) {
         const now = new Date();
         const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         const startValue = formatYearMonthLocal(startDate);
-        startMonthInput.value = startValue;
         const endDate = new Date(now.getFullYear() + 10, now.getMonth(), 1);
-        endMonthInput.value = formatYearMonthLocal(endDate);
+        const endValue = formatYearMonthLocal(endDate);
         weekSelect.value = "1";
-        frequencySelect.value = "";
+        const defaultFrequencyValue =
+          Object.entries(frequencyRules).find(([, cfg]) => cfg.start && cfg.end && !cfg.due)?.[0] ||
+          "";
+        frequencySelect.value = defaultFrequencyValue;
+        updateFrequencyControls();
+        // Re-apply after control toggle so values never end up blank.
+        startMonthInput.value = startValue;
+        endMonthInput.value = endValue;
         if (quarterSelect) {
           const monthForQuarter = Number(startValue.slice(5));
           quarterSelect.value = Math.ceil(monthForQuarter / 3).toString();
@@ -3351,7 +3357,6 @@ function renderParents(parents) {
         }
         syncRegistrantToCurrentUser();
         formMessage.textContent = "";
-        updateFrequencyControls();
       }
 
 
