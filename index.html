@@ -565,15 +565,44 @@
     }
     #parent-table th:nth-child(11),
     #parent-table td:nth-child(11) {
-      width: 28ch;
-      min-width: 28ch;
-      max-width: 28ch;
+      width: 33ch;
+      min-width: 33ch;
+      max-width: 33ch;
     }
     #parent-table td:nth-child(11),
     #routine-table td:nth-child(14) {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    /* Hide status column and move its width to summary (keep table total width) */
+    #parent-table col:nth-child(10),
+    #routine-table col:nth-child(13) {
+      width: 0 !important;
+      min-width: 0 !important;
+      max-width: 0 !important;
+      visibility: collapse;
+    }
+    #parent-table th:nth-child(10),
+    #parent-table td:nth-child(10),
+    #routine-table th:nth-child(13),
+    #routine-table td:nth-child(13) {
+      display: none !important;
+      width: 0 !important;
+      min-width: 0 !important;
+      max-width: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+    }
+    #parent-table col:nth-child(11),
+    #routine-table col:nth-child(14),
+    #parent-table th:nth-child(11),
+    #parent-table td:nth-child(11),
+    #routine-table th:nth-child(14),
+    #routine-table td:nth-child(14) {
+      width: 33ch !important;
+      min-width: 33ch !important;
+      max-width: 33ch !important;
     }
     #parent-table td:nth-child(4),
     #routine-table td:nth-child(4),
@@ -1178,7 +1207,7 @@
               <col style="width:20ch;" />
               <col style="width:6ch;" />
               <col style="width:5ch;" />
-              <col style="width:28ch;" />
+              <col style="width:33ch;" />
             </colgroup>
           <thead>
             <tr>
@@ -1244,7 +1273,7 @@
             <col style="width:20ch;" />
             <col style="width:6ch;" />
             <col style="width:5ch;" />
-            <col style="width:28ch;" />
+            <col style="width:33ch;" />
           </colgroup>
           <thead>
             <tr>
