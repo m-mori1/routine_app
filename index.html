@@ -2544,6 +2544,16 @@ function renderParents(parents) {
           const timestamp = new Date(value).getTime();
           return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
         };
+        const formatDueDateCompact = (value) => {
+          if (!value) {
+            return "";
+          }
+          const d = new Date(value);
+          if (Number.isNaN(d.getTime())) {
+            return "";
+          }
+          return `${d.getMonth() + 1}/${d.getDate()}`;
+        };
         if (routineSortState.key) {
           list = sortByState(list, routineSortState);
         } else {
@@ -2588,7 +2598,7 @@ function renderParents(parents) {
             <td>${escapeHtml(routine.quarter)}</td>
             <td>${escapeHtml(routine.month)}</td>
             <td>${escapeHtml(routine.week_num)}</td>
-            <td>${escapeHtml(routine.due_date ? new Date(routine.due_date).toLocaleDateString() : "")}</td>
+            <td>${escapeHtml(formatDueDateCompact(routine.due_date))}</td>
             <td>${escapeHtml(routine.assignee)}</td>
             <td>${escapeHtml(routine.registrant || "")}</td>
             <td>${escapeHtml(formatStatus(routine.status))}</td>
@@ -2673,7 +2683,7 @@ function renderParents(parents) {
           row.innerHTML = `
             <td><input type="checkbox" class="routine-complete-checkbox" data-record-no="${routine.record_no}" /></td>
             <td>${escapeHtml(routine.routine_no)}</td>
-            <td>${escapeHtml(routine.due_date ? new Date(routine.due_date).toLocaleDateString() : "")}</td>
+            <td>${escapeHtml(formatDueDateCompact(routine.due_date))}</td>
             <td>${escapeHtml(formatStatus(routine.status))}</td>
             <td>${escapeHtml(routine.summary)}</td>
           `;
