@@ -139,6 +139,7 @@
       margin-bottom: 10px;
       margin-left: 0;
       padding-left: 0;
+      align-items: flex-end;
     }
     .parent-kind-tabs button,
     .routine-kind-tabs button {
@@ -157,6 +158,23 @@
       background: #1d4ed8;
       color: #fff;
       border-color: #1d4ed8;
+    }
+    .parent-search-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.75rem;
+      color: #475569;
+      margin-left: 8px;
+    }
+    .parent-search-field input {
+      width: 220px;
+      min-width: 180px;
+      height: 30px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.85rem;
     }
     .filters label {
       display: flex;
@@ -690,6 +708,7 @@
     #routine-edit-form textarea[name="summary"] {
       width: 100%;
       min-width: 0;
+      min-height: 120px;
     }
     #routine-form select[name="task_kind"] {
       width: 160px;
@@ -718,14 +737,13 @@
       width: min(760px, 92vw);
       max-width: 760px;
     }
-    #routine-edit-form .summary-actions-row {
+    #routine-edit-form .assignee-summary-row {
       grid-template-columns: repeat(2, minmax(200px, 1fr));
       align-items: start;
     }
-    #routine-edit-form .summary-actions-row .form-actions {
-      margin-top: 0;
+    #routine-edit-form .form-actions {
+      margin-top: 8px;
       justify-content: flex-start;
-      align-self: end;
     }
     @media (max-width: 720px) {
       #routine-form .title-kind-row,
@@ -738,11 +756,8 @@
       #routine-form .creation-summary-actions-row .form-actions {
         justify-content: flex-end;
       }
-      #routine-edit-form .summary-actions-row {
+      #routine-edit-form .assignee-summary-row {
         grid-template-columns: 1fr;
-      }
-      #routine-edit-form .summary-actions-row .form-actions {
-        justify-content: flex-end;
       }
     }
     .assignee-manager {
@@ -1140,6 +1155,10 @@
         <button type="button" class="active" data-kind-filter="all">全て</button>
         <button type="button" data-kind-filter="グループ">グループ</button>
         <button type="button" data-kind-filter="個人">個人</button>
+        <label class="parent-search-field">
+          タイトル検索
+          <input id="parent-title-search" type="text" placeholder="部分一致" />
+        </label>
       </div>
       <div class="table-wrapper">
         <table id="parent-table">
@@ -1198,6 +1217,10 @@
         <label>
           担当者
           <select name="filter-routine-assignee"></select>
+        </label>
+        <label>
+          タイトル検索
+          <input id="routine-title-search" type="text" placeholder="部分一致" />
         </label>
         <button id="routine-filter-btn" type="button">絞り込み</button>
         <button id="routine-clear-btn" type="button">クリア</button>
@@ -1460,7 +1483,7 @@
                 </select>
               </label>
             </div>
-            <div class="form-row two-column">
+            <div class="form-row two-column assignee-summary-row">
               <label>
                 <span>担当者</span>
                 <div class="assignee-manager">
@@ -1473,16 +1496,14 @@
                 </div>
                 <input type="hidden" name="assignee" />
               </label>
-            </div>
-            <div class="form-row two-column summary-actions-row">
               <label>
                 <span>備考</span>
                 <textarea name="summary" maxlength="500"></textarea>
               </label>
-              <div class="form-actions">
-                <button class="primary" type="submit">更新</button>
-                <button class="secondary" type="button" data-close="routine-edit-overlay">閉じる</button>
-              </div>
+            </div>
+            <div class="form-actions">
+              <button class="primary" type="submit">更新</button>
+              <button class="secondary" type="button" data-close="routine-edit-overlay">閉じる</button>
             </div>
             <p class="form-message" id="routine-edit-message"></p>
           </form>
@@ -1655,6 +1676,7 @@
         year: document.querySelector("[name='filter-routine-year']"),
         month: document.querySelector("[name='filter-routine-month']"),
         assignee: document.querySelector("[name='filter-routine-assignee']"),
+        title: document.getElementById("routine-title-search"),
       };
       function buildRoutineFilterYearOptions() {
         const select = routineFilterInputs.year;
@@ -1711,6 +1733,9 @@
         }
         if (routineFilterInputs.assignee) {
           routineFilterInputs.assignee.value = "";
+        }
+        if (routineFilterInputs.title) {
+          routineFilterInputs.title.value = "";
         }
       }
       const routineFilterBtn = document.getElementById("routine-filter-btn");
@@ -1797,6 +1822,7 @@
       const routinePaginationPrev = document.getElementById("routine-page-prev");
       const routinePaginationNext = document.getElementById("routine-page-next");
       const routinePageLabel = document.getElementById("routine-page-label");
+      const parentTitleSearchInput = document.getElementById("parent-title-search");
       const parentKindTabButtons = Array.from(
         document.querySelectorAll(".parent-kind-tabs [data-kind-filter]")
       );
@@ -1815,6 +1841,7 @@
       let parentHasNext = false;
       let parentHasPrev = false;
       let parentKindFilter = "all";
+      let parentTitleFilter = "";
       let routinePage = 1;
       const routinePageSize = 20;
       let routineHasNext = false;
@@ -2215,6 +2242,9 @@ async function fetchParents(filters = {}) {
           if (parentKindFilter && parentKindFilter !== "all") {
             url.searchParams.set("task_kind", parentKindFilter);
           }
+          if (parentTitleFilter) {
+            url.searchParams.set("title", parentTitleFilter);
+          }
           url.searchParams.set("page", parentPage);
           url.searchParams.set("page_size", parentPageSize);
           const response = await fetch(url, { cache: "no-store" });
@@ -2273,7 +2303,13 @@ async function fetchRoutines() {
 
 function renderParents(parents) {
         parentTableBody.innerHTML = "";
-        const sortedParents = sortByState(parents, parentSortState);
+        const keyword = parentTitleFilter.toLowerCase();
+        const filteredParents = keyword
+          ? parents.filter((parent) =>
+              String(parent?.title || "").toLowerCase().includes(keyword)
+            )
+          : parents;
+        const sortedParents = sortByState(filteredParents, parentSortState);
         if (!sortedParents.length) {
           parentTableBody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#64748b; padding:16px;">該当データがありません</td></tr>`;
           return;
@@ -2339,6 +2375,11 @@ function renderParents(parents) {
         parentKindTabButtons.forEach((button) => {
           button.classList.toggle("active", button.dataset.kindFilter === parentKindFilter);
         });
+      }
+      function applyParentTitleSearch() {
+        parentTitleFilter = (parentTitleSearchInput?.value || "").trim();
+        parentPage = 1;
+        fetchParents();
       }
 
       function applyRoutineKindTabState() {
@@ -2426,6 +2467,7 @@ function renderParents(parents) {
         const yearFilter = routineFilterInputs.year?.value?.trim() || "";
         const monthFilter = routineFilterInputs.month?.value?.trim() || "";
         const assignee = routineFilterInputs.assignee?.value?.trim() || "";
+        const titleKeyword = (routineFilterInputs.title?.value?.trim() || "").toLowerCase();
         const filterYearNum = Number(yearFilter);
         const filterMonthNum = Number(monthFilter);
         const hasYearMonthFilter =
@@ -2448,6 +2490,20 @@ function renderParents(parents) {
           }
           return null;
         };
+        const isIncompleteStatus = (value) => {
+          const status = String(value ?? "").trim();
+          return status !== "完了" && status.toLowerCase() !== "completed";
+        };
+        const isPastComparedToFilter = (item) => {
+          if (!hasYearMonthFilter) {
+            return false;
+          }
+          const ym = toYearMonth(item);
+          if (!ym) {
+            return false;
+          }
+          return ym.year < filterYearNum || (ym.year === filterYearNum && ym.month < filterMonthNum);
+        };
         if (selectedParentId) {
           list = list.filter((item) => item.task_no === selectedParentId);
         }
@@ -2459,7 +2515,8 @@ function renderParents(parents) {
             }
             const matchesSelectedMonth =
               ym.year === filterYearNum && ym.month === filterMonthNum;
-            return matchesSelectedMonth;
+            const isPastIncomplete = isPastComparedToFilter(item) && isIncompleteStatus(item.status);
+            return matchesSelectedMonth || isPastIncomplete;
           });
         } else {
           if (yearFilter) {
@@ -2482,6 +2539,11 @@ function renderParents(parents) {
               (item.assignee && item.assignee.includes(assignee)) ||
               (item.registrant && item.registrant.includes(assignee))
             );
+        }
+        if (titleKeyword) {
+          list = list.filter((item) =>
+            String(item?.title || "").toLowerCase().includes(titleKeyword)
+          );
         }
         const toNumberOrMax = (value) => {
           const num = Number(value);
@@ -2507,28 +2569,17 @@ function renderParents(parents) {
           const dd = String(d.getDate()).padStart(2, "0");
           return `${yyyy}/${mm}/${dd}`;
         };
-        if (routineSortState.key) {
-          list = sortByState(list, routineSortState);
-        } else {
-          list = [...list].sort((a, b) => {
-            const compareValues = [
-              [toNumberOrMax(a.task_no), toNumberOrMax(b.task_no)],
-              [toNumberOrMax(a.routine_no), toNumberOrMax(b.routine_no)],
-              [toNumberOrMax(a.year), toNumberOrMax(b.year)],
-              [toNumberOrMax(a.half_year), toNumberOrMax(b.half_year)],
-              [toNumberOrMax(a.quarter), toNumberOrMax(b.quarter)],
-              [toNumberOrMax(a.month), toNumberOrMax(b.month)],
-              [toNumberOrMax(a.week_num), toNumberOrMax(b.week_num)],
-              [toDateOrMax(a.due_date), toDateOrMax(b.due_date)],
-            ];
-            for (const [left, right] of compareValues) {
-              if (left !== right) {
-                return left - right;
-              }
-            }
-            return 0;
-          });
-        }
+        list = [...list].sort((a, b) => {
+          const dueDiff = toDateOrMax(a.due_date) - toDateOrMax(b.due_date);
+          if (dueDiff !== 0) {
+            return dueDiff;
+          }
+          const taskDiff = toNumberOrMax(a.task_no) - toNumberOrMax(b.task_no);
+          if (taskDiff !== 0) {
+            return taskDiff;
+          }
+          return toNumberOrMax(a.routine_no) - toNumberOrMax(b.routine_no);
+        });
         if (!list.length) {
           routineTableBody.innerHTML = `<tr><td colspan="13" style="text-align:center; color:#64748b; padding:16px;">該当データがありません</td></tr>`;
           return;
@@ -3314,6 +3365,13 @@ function renderParents(parents) {
         selectParent(null);
         renderRoutines(routineCache);
       });
+      routineFilterInputs.title?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          selectParent(null);
+          renderRoutines(routineCache);
+        }
+      });
       routineClearBtn.addEventListener("click", () => {
         selectParent(null);
         setRoutineFilterDefaults();
@@ -3343,6 +3401,17 @@ function renderParents(parents) {
           applyParentKindTabState();
           fetchParents();
         });
+      });
+      parentTitleSearchInput?.addEventListener("click", (event) => {
+        if (event.button === 0) {
+          applyParentTitleSearch();
+        }
+      });
+      parentTitleSearchInput?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          applyParentTitleSearch();
+        }
       });
       routineKindTabButtons.forEach((button) => {
         button.addEventListener("click", () => {
