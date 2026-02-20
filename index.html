@@ -1584,6 +1584,7 @@
         `${apiBase}child/${recordNo}/complete-preview`;
       const employeesEndpoint = `${apiBase}employees`;
       const ALL_EMPLOYEES_LABEL = "社員全員";
+      const ORG_ALL_LABEL = "全員";
       const organizationUserNames = new Set();
       const employeeOnlyUserNames = new Set();
       let currentDepartmentCD = "";
@@ -1822,6 +1823,7 @@
         pickerEl: creationAssigneeSelect,
         hiddenInput: assigneeHiddenInput,
         validator: (value) =>
+          value === ORG_ALL_LABEL ||
           value === ALL_EMPLOYEES_LABEL ||
           organizationUserNames.has(value) ||
           employeeOnlyUserNames.has(value),
@@ -1832,6 +1834,7 @@
         pickerEl: routineEditAssigneeSelect,
         hiddenInput: routineEditAssigneeHiddenInput,
         validator: (value) =>
+          value === ORG_ALL_LABEL ||
           value === ALL_EMPLOYEES_LABEL ||
           organizationUserNames.has(value) ||
           employeeOnlyUserNames.has(value),
@@ -2063,7 +2066,11 @@
         if (pickerNode) {
           pickerNode.addEventListener("change", () => {
             const value = pickerNode.value;
-            if (value === ALL_EMPLOYEES_LABEL) {
+            if (value === ORG_ALL_LABEL) {
+              Array.from(organizationUserNames)
+                .sort((a, b) => a.localeCompare(b))
+                .forEach((name) => addEntry(name));
+            } else if (value === ALL_EMPLOYEES_LABEL) {
               employeeOnlyCandidateNames.forEach((name) => addEntry(name));
             } else {
               addEntry(value);
@@ -2152,6 +2159,9 @@
           ];
           optionNodes.push(
             ...names.map((name) => `<option value="${name}">${name}</option>`)
+          );
+          optionNodes.push(
+            `<option value="${ORG_ALL_LABEL}">${ORG_ALL_LABEL}</option>`
           );
           optionNodes.push(
             `<option value="${ALL_EMPLOYEES_LABEL}">${ALL_EMPLOYEES_LABEL}</option>`
