@@ -165,10 +165,6 @@
       color: #475569;
       gap: 4px;
     }
-    .status-line {
-      font-size: 0.85rem;
-      color: #475569;
-    }
     .table-wrapper {
       background: #fff;
       border-radius: 10px;
@@ -422,12 +418,6 @@
     #routine-table td:nth-child(9) {
       text-align: right;
     }
-    #routine-table td:nth-child(14),
-    #routine-table th:nth-child(14) {
-      width: 16ch;
-      min-width: 16ch;
-      max-width: 16ch;
-    }
     /* Routine table width overrides */
     #routine-table td:first-child,
     #routine-table th:first-child {
@@ -484,9 +474,7 @@
       max-width: 20ch !important;
     }
     #routine-table th:nth-child(12),
-    #routine-table td:nth-child(12),
-    #routine-table th:nth-child(13),
-    #routine-table td:nth-child(13) {
+    #routine-table td:nth-child(12) {
       width: 6ch !important;
       min-width: 6ch !important;
       max-width: 6ch !important;
@@ -495,11 +483,11 @@
     #routine-table td:nth-child(12) {
       text-align: center;
     }
-    #routine-table th:nth-child(14),
-    #routine-table td:nth-child(14) {
-      width: 28ch !important;
-      min-width: 28ch !important;
-      max-width: 28ch !important;
+    #routine-table th:nth-child(13),
+    #routine-table td:nth-child(13) {
+      width: 40ch !important;
+      min-width: 40ch !important;
+      max-width: 40ch !important;
     }
     /* Parent table width overrides */
     #parent-table th:nth-child(2),
@@ -558,48 +546,15 @@
     }
     #parent-table th:nth-child(10),
     #parent-table td:nth-child(10) {
-      width: 5ch;
-      min-width: 5ch;
-      max-width: 5ch;
-      white-space: nowrap;
+      width: 40ch;
+      min-width: 40ch;
+      max-width: 40ch;
     }
-    #parent-table th:nth-child(11),
-    #parent-table td:nth-child(11) {
-      width: 33ch;
-      min-width: 33ch;
-      max-width: 33ch;
-    }
-    #parent-table td:nth-child(11),
-    #routine-table td:nth-child(14) {
+    #parent-table td:nth-child(10),
+    #routine-table td:nth-child(13) {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-    /* Routine/Parent: hide status column, keep other column widths */
-    #parent-table col:nth-child(10),
-    #routine-table col:nth-child(13) {
-      width: 0 !important;
-      min-width: 0 !important;
-      max-width: 0 !important;
-    }
-    #parent-table th:nth-child(10),
-    #parent-table td:nth-child(10),
-    #routine-table th:nth-child(13),
-    #routine-table td:nth-child(13) {
-      display: none !important;
-      width: 0 !important;
-      min-width: 0 !important;
-      max-width: 0 !important;
-      padding: 0 !important;
-      border: 0 !important;
-    }
-    #parent-table th:nth-child(11),
-    #parent-table td:nth-child(11),
-    #routine-table th:nth-child(14),
-    #routine-table td:nth-child(14) {
-      width: 33ch !important;
-      min-width: 33ch !important;
-      max-width: 33ch !important;
     }
     #parent-table td:nth-child(4),
     #routine-table td:nth-child(4),
@@ -731,11 +686,6 @@
     textarea {
       min-height: 70px;
       resize: vertical;
-    }
-    #routine-edit-form select[name="status"] {
-      min-width: 140px;
-      max-width: 160px;
-      width: 160px;
     }
     #routine-edit-form textarea[name="summary"] {
       width: 100%;
@@ -1079,8 +1029,8 @@
     #routine-table td:nth-child(3),
     #routine-table th:nth-child(7),
     #routine-table td:nth-child(7),
-    #routine-table th:nth-child(13),
-    #routine-table td:nth-child(13) {
+    #routine-table th:nth-child(12),
+    #routine-table td:nth-child(12) {
       text-align: center !important;
       vertical-align: middle !important;
       padding-left: 0 !important;
@@ -1203,8 +1153,7 @@
               <col style="width:5ch;" />
               <col style="width:20ch;" />
               <col style="width:6ch;" />
-              <col style="width:5ch;" />
-              <col style="width:33ch;" />
+              <col style="width:40ch;" />
             </colgroup>
           <thead>
             <tr>
@@ -1217,7 +1166,6 @@
               <th>終了月</th>
               <th>担当者</th>
               <th>登録者</th>
-              <th>ステータス</th>
               <th>備考</th>
             </tr>
           </thead>
@@ -1269,8 +1217,7 @@
             <col style="width:6ch;" />
             <col style="width:20ch;" />
             <col style="width:6ch;" />
-            <col style="width:5ch;" />
-            <col style="width:33ch;" />
+            <col style="width:40ch;" />
           </colgroup>
           <thead>
             <tr>
@@ -1286,7 +1233,6 @@
               <th>期日</th>
               <th>担当者</th>
               <th>登録者</th>
-              <th>ステータス</th>
               <th>備考</th>
             </tr>
           </thead>
@@ -1434,16 +1380,6 @@
         <input type="hidden" name="task_no" />
         <div class="form-row second-row">
           <label>
-            <span>ステータス</span>
-            <select name="status">
-              <option value="未着手">未着手</option>
-              <option value="着手">着手</option>
-              <option value="完了">完了</option>
-            </select>
-          </label>
-        </div>
-        <div class="form-row second-row">
-          <label>
             <span>備考</span>
             <textarea name="summary" maxlength="500"></textarea>
           </label>
@@ -1537,14 +1473,6 @@
                 </div>
                 <input type="hidden" name="assignee" />
               </label>
-              <label>
-                <span>ステータス</span>
-                <select name="status">
-                  <option value="未着手">未着手</option>
-                  <option value="着手">着手</option>
-                  <option value="完了">完了</option>
-                </select>
-              </label>
             </div>
             <div class="form-row two-column summary-actions-row">
               <label>
@@ -1577,7 +1505,6 @@
               <th>完了</th>
               <th>ルーチンNo</th>
               <th>期日</th>
-              <th>ステータス</th>
               <th>備考</th>
             </tr>
           </thead>
@@ -1806,8 +1733,6 @@
       const halfSelect = routineForm.querySelector('[name="half_year"]');
       const taskKindSelect = routineForm.querySelector('[name="task_kind"]');
       const titleInput = routineForm.querySelector('[name="title"]');
-      const statusSelect = routineForm.querySelector('[name="status"]');
-      const creationStatusLabel = statusSelect?.closest("label");
       const summaryInput = routineForm.querySelector('[name="summary"]');
       startMonthInput?.addEventListener("change", () => {
         applyHalfFromStartMonth(startMonthInput.value);
@@ -1905,7 +1830,6 @@
         "end_month",
         "assignee",
         "registrant",
-        "status",
         "summary",
       ];
       const routineSortColumns = [
@@ -1921,7 +1845,6 @@
         "due_date",
         "assignee",
         "registrant",
-        "status",
         "summary",
       ];
       const numericSortColumns = new Set([
@@ -1946,16 +1869,6 @@
         monthly: "月次",
         quarterly: "四半期",
         yearly: "年次",
-      };
-      const statusLabels = {
-        未対応: "未着手",
-        未着手: "未着手",
-        着手: "着手",
-        完了: "完了",
-        pending: "未着手",
-        in_progress: "着手",
-        completed: "完了",
-        "??": "完了",
       };
       const screenNames = {
         parents: "親タスク一覧",
@@ -1985,12 +1898,6 @@
         return frequencyLabels[value] || value;
       }
 
-      function formatStatus(value) {
-        if (!value) {
-          return "";
-        }
-        return statusLabels[value] || value;
-      }
 
       function splitAssignees(value) {
         if (!value) {
@@ -2321,7 +2228,7 @@ async function fetchParents(filters = {}) {
           setStatus("");
         } catch (error) {
           setStatus(`親タスク取得に失敗しました: ${error.message}`);
-          parentTableBody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:#64748b; padding:16px;">取得に失敗しました</td></tr>`;
+          parentTableBody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#64748b; padding:16px;">取得に失敗しました</td></tr>`;
         }
       }
 
@@ -2360,7 +2267,7 @@ async function fetchRoutines() {
           setStatus("");
         } catch (error) {
           setStatus(`Failed to load routines: ${error.message}`);
-          routineTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#64748b; padding:16px;">Failed to load</td></tr>`;
+          routineTableBody.innerHTML = `<tr><td colspan="13" style="text-align:center; color:#64748b; padding:16px;">Failed to load</td></tr>`;
         }
       }
 
@@ -2368,7 +2275,7 @@ function renderParents(parents) {
         parentTableBody.innerHTML = "";
         const sortedParents = sortByState(parents, parentSortState);
         if (!sortedParents.length) {
-          parentTableBody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:#64748b; padding:16px;">該当データがありません</td></tr>`;
+          parentTableBody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#64748b; padding:16px;">該当データがありません</td></tr>`;
           return;
         }
         sortedParents.forEach((parent) => {
@@ -2393,7 +2300,6 @@ function renderParents(parents) {
             <td>${escapeHtml(parent.end_month)}</td>
             <td>${escapeHtml(parent.assignee)}</td>
             <td>${escapeHtml(parent.registrant || "")}</td>
-            <td>${escapeHtml(formatStatus(parent.status))}</td>
             <td>${escapeHtml(parent.summary || "")}</td>
           `;
           row.classList.toggle("selected-row", parent.task_no === selectedParentId);
@@ -2542,20 +2448,6 @@ function renderParents(parents) {
           }
           return null;
         };
-        const isIncompleteStatus = (value) => {
-          const status = String(value ?? "").trim();
-          return status !== "完了";
-        };
-        const isPastComparedToFilter = (item) => {
-          if (!hasYearMonthFilter) {
-            return false;
-          }
-          const ym = toYearMonth(item);
-          if (!ym) {
-            return false;
-          }
-          return ym.year < filterYearNum || (ym.year === filterYearNum && ym.month < filterMonthNum);
-        };
         if (selectedParentId) {
           list = list.filter((item) => item.task_no === selectedParentId);
         }
@@ -2567,8 +2459,7 @@ function renderParents(parents) {
             }
             const matchesSelectedMonth =
               ym.year === filterYearNum && ym.month === filterMonthNum;
-            const isPastIncomplete = isPastComparedToFilter(item) && isIncompleteStatus(item.status);
-            return matchesSelectedMonth || isPastIncomplete;
+            return matchesSelectedMonth;
           });
         } else {
           if (yearFilter) {
@@ -2639,7 +2530,7 @@ function renderParents(parents) {
           });
         }
         if (!list.length) {
-          routineTableBody.innerHTML = `<tr><td colspan="14" style="text-align:center; color:#64748b; padding:16px;">該当データがありません</td></tr>`;
+          routineTableBody.innerHTML = `<tr><td colspan="13" style="text-align:center; color:#64748b; padding:16px;">該当データがありません</td></tr>`;
           return;
         }
         list.forEach((routine) => {
@@ -2663,7 +2554,6 @@ function renderParents(parents) {
             <td>${escapeHtml(formatDueDateCompact(routine.due_date))}</td>
             <td>${escapeHtml(routine.assignee)}</td>
             <td>${escapeHtml(routine.registrant || "")}</td>
-            <td>${escapeHtml(formatStatus(routine.status))}</td>
             <td>${escapeHtml(routine.summary)}</td>
           `;
           row.addEventListener("click", (event) => {
@@ -2737,7 +2627,7 @@ function renderParents(parents) {
       function renderRoutineModalList(list) {
         routineModalBody.innerHTML = "";
         if (!list.length) {
-          routineModalBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#64748b; padding:12px;">紐づくルーチンがありません</td></tr>`;
+          routineModalBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#64748b; padding:12px;">紐づくルーチンがありません</td></tr>`;
           return;
         }
         list.forEach((routine) => {
@@ -2746,7 +2636,6 @@ function renderParents(parents) {
             <td><input type="checkbox" class="routine-complete-checkbox" data-record-no="${routine.record_no}" /></td>
             <td>${escapeHtml(routine.routine_no)}</td>
             <td>${escapeHtml(formatDueDateCompact(routine.due_date))}</td>
-            <td>${escapeHtml(formatStatus(routine.status))}</td>
             <td>${escapeHtml(routine.summary)}</td>
           `;
           routineModalBody.appendChild(row);
@@ -2946,7 +2835,6 @@ function renderParents(parents) {
           syncRoutineEditHalfQuarterFromMonth();
           syncRoutineEditDerivedFields();
         }
-        routineEditForm.status.value = routine.status;
         routineEditForm.summary.value = routine.summary || "";
         routineEditorParentId = routine.task_no;
         routineEditAssigneeManager?.setAssignees(
@@ -2967,7 +2855,6 @@ function renderParents(parents) {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                status: parentEditForm.status.value,
                 summary: parentEditForm.summary.value,
               }),
             });
@@ -3017,7 +2904,6 @@ function renderParents(parents) {
               due_date: routineEditForm.due_date.value || null,
               title: routineEditTitleInput?.value,
               assignee: routineEditAssigneeManager?.getAssignees(),
-              status: routineEditForm.status.value,
               summary: routineEditForm.summary.value,
               registrant: currentLoginName,
             }),
@@ -3093,7 +2979,6 @@ function renderParents(parents) {
           assignee: creationAssigneeManager?.getAssignees(),
           task_kind: formData.get("task_kind") || null,
           registrant: registrantInput?.value || currentLoginName,
-          status: "未着手",
           summary: formData.get("summary"),
         };
         try {
@@ -3136,7 +3021,6 @@ function renderParents(parents) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               ...payload,
-              details: [{ status: payload.status || "未着手" }],
             }),
           });
           if (!response.ok) {
@@ -3267,9 +3151,6 @@ function renderParents(parents) {
         if (registrantInput) {
           registrantInput.disabled = isParentEdit;
         }
-        if (creationStatusLabel) {
-          creationStatusLabel.style.display = isParentEdit ? "none" : "";
-        }
       }
       function setCreationMode(parent = null) {
         const nextTaskNo = parent ? Number(parent.task_no) : null;
@@ -3300,9 +3181,6 @@ function renderParents(parents) {
         endMonthInput.value = parent.end_month || "";
         dueDateInput.value = parent.due_date ? parent.due_date.slice(0, 10) : "";
         titleInput.value = parent.title || "";
-        if (statusSelect) {
-          statusSelect.value = parent.status || "未着手";
-        }
         summaryInput.value = parent.summary || "";
         const parentAssignees = parent.assignees || splitAssignees(parent.assignee);
         editingParentOriginalAssignee = parentAssignees.join("; ");
