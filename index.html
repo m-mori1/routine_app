@@ -370,9 +370,9 @@
     #parent-table td:nth-child(9),
     #routine-table th:nth-child(13),
     #routine-table td:nth-child(13) {
-      width: 8ch;
-      min-width: 8ch;
-      max-width: 8ch;
+      width: 7ch;
+      min-width: 7ch;
+      max-width: 7ch;
     }
     #parent-table th:nth-child(10),
     #parent-table td:nth-child(10),
@@ -453,6 +453,22 @@
       max-width: 4ch !important;
       text-align: center;
     }
+    #routine-table thead th:nth-child(2) {
+      text-align: center !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+    #routine-table thead th:nth-child(7) {
+      text-align: center !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+    #parent-table thead th:nth-child(2),
+    #parent-table thead th:nth-child(3) {
+      text-align: center !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
     #routine-table th:nth-child(3),
     #routine-table td:nth-child(3) {
       width: 4ch !important;
@@ -490,9 +506,9 @@
     }
     #routine-table th:nth-child(11),
     #routine-table td:nth-child(11) {
-      width: 6ch !important;
-      min-width: 6ch !important;
-      max-width: 6ch !important;
+      width: 7ch !important;
+      min-width: 7ch !important;
+      max-width: 7ch !important;
     }
     #routine-table td:nth-child(11),
     #routine-table td:nth-child(12),
@@ -507,9 +523,9 @@
     }
     #routine-table th:nth-child(13),
     #routine-table td:nth-child(13) {
-      width: 6ch !important;
-      min-width: 6ch !important;
-      max-width: 6ch !important;
+      width: 7ch !important;
+      min-width: 7ch !important;
+      max-width: 7ch !important;
     }
     #routine-table th:nth-child(13),
     #routine-table td:nth-child(13) {
@@ -556,11 +572,11 @@
     #parent-table td:nth-child(6),
     #parent-table th:nth-child(7),
     #parent-table td:nth-child(7) {
-      width: 5ch;
-      min-width: 5ch;
-      max-width: 5ch;
+      width: 7ch;
+      min-width: 7ch;
+      max-width: 7ch;
       white-space: nowrap;
-      text-align: center;
+      text-align: center !important;
     }
     #parent-table th:nth-child(8),
     #parent-table td:nth-child(8) {
@@ -570,9 +586,9 @@
     }
     #parent-table th:nth-child(9),
     #parent-table td:nth-child(9) {
-      width: 6ch;
-      min-width: 6ch;
-      max-width: 6ch;
+      width: 7ch;
+      min-width: 7ch;
+      max-width: 7ch;
       white-space: nowrap;
       text-align: center;
     }
@@ -581,6 +597,10 @@
       width: 40ch;
       min-width: 40ch;
       max-width: 40ch;
+    }
+    #parent-table td:nth-child(6),
+    #parent-table td:nth-child(7) {
+      text-align: center !important;
     }
     #parent-table td:nth-child(8),
     #parent-table td:nth-child(9),
@@ -712,6 +732,16 @@
       input[type="date"] {
         min-width: 140px;
         max-width: 160px;
+      }
+      input[name="start_month"],
+      input[name="end_month"] {
+        text-align: center;
+      }
+      input[name="start_month"]::-webkit-datetime-edit,
+      input[name="end_month"]::-webkit-datetime-edit {
+        display: inline-flex;
+        width: 100%;
+        justify-content: center;
       }
       input[disabled],
       select[disabled],
@@ -1187,10 +1217,10 @@
               <col style="width:6ch;" />
               <col style="width:25ch;" />
               <col style="width:5ch;" />
-              <col style="width:5ch;" />
-              <col style="width:5ch;" />
+              <col style="width:7ch;" />
+              <col style="width:7ch;" />
               <col style="width:20ch;" />
-              <col style="width:6ch;" />
+              <col style="width:7ch;" />
               <col style="width:40ch;" />
             </colgroup>
           <thead>
@@ -1257,9 +1287,9 @@
             <col style="width:4ch;" />
             <col style="width:4ch;" />
             <col style="width:4ch;" />
-            <col style="width:6ch;" />
+            <col style="width:7ch;" />
             <col style="width:20ch;" />
-            <col style="width:6ch;" />
+            <col style="width:7ch;" />
             <col style="width:35ch;" />
           </colgroup>
           <thead>
@@ -1860,6 +1890,7 @@
       let selectedParent = null;
       let editingParentId = null;
       let editingParentOriginalAssignee = "";
+      let editingParentOriginalEndMonth = "";
       let parentPage = 1;
       const parentPageSize = 20;
       let parentHasNext = false;
@@ -2601,17 +2632,21 @@ function renderParents(parents) {
           const dd = String(d.getDate()).padStart(2, "0");
           return `${yyyy}/${mm}/${dd}`;
         };
-        list = [...list].sort((a, b) => {
-          const dueDiff = toDateOrMax(a.due_date) - toDateOrMax(b.due_date);
-          if (dueDiff !== 0) {
-            return dueDiff;
-          }
-          const taskDiff = toNumberOrMax(a.task_no) - toNumberOrMax(b.task_no);
-          if (taskDiff !== 0) {
-            return taskDiff;
-          }
-          return toNumberOrMax(a.routine_no) - toNumberOrMax(b.routine_no);
-        });
+        if (routineSortState.key) {
+          list = sortByState(list, routineSortState);
+        } else {
+          list = [...list].sort((a, b) => {
+            const dueDiff = toDateOrMax(a.due_date) - toDateOrMax(b.due_date);
+            if (dueDiff !== 0) {
+              return dueDiff;
+            }
+            const taskDiff = toNumberOrMax(a.task_no) - toNumberOrMax(b.task_no);
+            if (taskDiff !== 0) {
+              return taskDiff;
+            }
+            return toNumberOrMax(a.routine_no) - toNumberOrMax(b.routine_no);
+          });
+        }
         if (!list.length) {
           routineTableBody.innerHTML = `<tr><td colspan="14" style="text-align:center; color:#64748b; padding:16px;">該当データがありません</td></tr>`;
           return;
@@ -3067,6 +3102,18 @@ function renderParents(parents) {
         };
         try {
           if (updateTargetTaskNo) {
+            const oldEndMonth = parseYmValue(editingParentOriginalEndMonth || "");
+            const newEndMonth = parseYmValue(payload.end_month || "");
+            if (oldEndMonth && newEndMonth && isYmBefore(newEndMonth, oldEndMonth)) {
+              formMessage.textContent = "\u7d42\u4e86\u6708\u306f\u73fe\u5728\u306e\u8a2d\u5b9a\u3088\u308a\u524d\u306b\u306f\u3067\u304d\u307e\u305b\u3093\u3002";
+              return;
+            }
+            if (oldEndMonth && newEndMonth && isYmBefore(oldEndMonth, newEndMonth)) {
+              const message = `${formatYmJa(oldEndMonth)}\u304b\u3089${formatYmJa(newEndMonth)}\u5206\u306e\u30eb\u30fc\u30c1\u30f3\u3092\u8ffd\u52a0\u4f5c\u6210\u3057\u307e\u3059\u3002`;
+              if (!window.confirm(message)) {
+                return;
+              }
+            }
             const response = await fetch(parentUpdate(updateTargetTaskNo), {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
@@ -3222,6 +3269,27 @@ function renderParents(parents) {
           halfSelect.value = quarterNum <= 2 ? "1" : "2";
         }
       }
+      function parseYmValue(value) {
+        if (!value || typeof value !== "string") {
+          return null;
+        }
+        const parts = value.split("-");
+        if (parts.length !== 2) {
+          return null;
+        }
+        const year = Number(parts[0]);
+        const month = Number(parts[1]);
+        if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+          return null;
+        }
+        return { year, month };
+      }
+      function isYmBefore(left, right) {
+        return left.year < right.year || (left.year === right.year && left.month < right.month);
+      }
+      function formatYmJa(ym) {
+        return `${ym.year}\u5e74${ym.month}\u6708`;
+      }
       function applyParentEditFieldLock(isParentEdit) {
         if (frequencySelect) {
           frequencySelect.disabled = isParentEdit;
@@ -3230,7 +3298,7 @@ function renderParents(parents) {
           startMonthInput.disabled = isParentEdit;
         }
         if (endMonthInput) {
-          endMonthInput.disabled = isParentEdit;
+          endMonthInput.disabled = false;
         }
         if (registrantInput) {
           registrantInput.disabled = isParentEdit;
@@ -3240,9 +3308,13 @@ function renderParents(parents) {
         const nextTaskNo = parent ? Number(parent.task_no) : null;
         editingParentId = Number.isFinite(nextTaskNo) && nextTaskNo > 0 ? nextTaskNo : null;
         editingParentOriginalAssignee = "";
+        editingParentOriginalEndMonth = parent?.end_month || "";
         const taskNoInput = routineForm?.querySelector('[name="task_no"]');
         if (taskNoInput) {
           taskNoInput.value = editingParentId ? String(editingParentId) : "";
+        }
+        if (!parent && endMonthInput) {
+          endMonthInput.removeAttribute("min");
         }
         applyParentEditFieldLock(Boolean(parent));
         creationTitle.textContent = parent ? "\u89aa\u30bf\u30b9\u30af\u7de8\u96c6" : "\u30bf\u30b9\u30af\u4f5c\u6210";
@@ -3263,6 +3335,9 @@ function renderParents(parents) {
           applyHalfFromQuarter(quarterSelect.value);
         }
         endMonthInput.value = parent.end_month || "";
+        if (endMonthInput && parent.end_month) {
+          endMonthInput.min = parent.end_month;
+        }
         dueDateInput.value = parent.due_date ? parent.due_date.slice(0, 10) : "";
         titleInput.value = parent.title || "";
         summaryInput.value = parent.summary || "";

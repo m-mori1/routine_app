@@ -499,6 +499,141 @@ def _build_entries(data, registrant, department_cd=None):
         due_date = _nth_friday(year, month, week_num)
         entries.append(_create_child(seq, due_date))
     return parent_entry, entries
+
+
+def _routine_frequency_step(frequency):
+    normalized_freq = (frequency or "").strip()
+    step_map = {
+        "週次": 1,
+        "月次": 1,
+        "四半期": 3,
+        "半期": 6,
+        "年次": 12,
+        "weekly": 1,
+        "monthly": 1,
+        "quarterly": 3,
+        "half-year": 6,
+        "halfyear": 6,
+        "yearly": 12,
+    }
+    return step_map.get(normalized_freq), normalized_freq
+
+
+def _build_extension_child_entries(current_parent, update_data):
+    requested_end_month = update_data.get("end_month")
+    if not requested_end_month:
+        return []
+
+    frequency_value = update_data.get("frequency") or current_parent.get("frequency")
+    step, normalized_freq = _routine_frequency_step(frequency_value)
+    if step is None:
+        # Spot/unknown frequencies do not support periodic extension here.
+        return []
+
+    start_month_value = update_data.get("start_month") or current_parent.get("start_month")
+    old_end_month_value = current_parent.get("end_month")
+    if not start_month_value or not old_end_month_value:
+        return []
+
+    start_year, start_month = _parse_ym(start_month_value)
+    old_end_year, old_end_month = _parse_ym(old_end_month_value)
+    new_end_year, new_end_month = _parse_ym(requested_end_month)
+
+    if not _month_leq(start_year, start_month, new_end_year, new_end_month):
+        raise ValueError("end_month must be the same or after start_month")
+    if _month_leq(new_end_year, new_end_month, old_end_year, old_end_month):
+        return []
+
+    month_raw = update_data.get("month")
+    if month_raw is None:
+        month_raw = current_parent.get("month")
+    if month_raw:
+        month_value = int(month_raw)
+    else:
+        month_value = start_month
+        if normalized_freq in {"四半期", "quarterly"}:
+            month_value = ((month_value - 1) % 3) + 1
+
+    week_raw = update_data.get("week_num")
+    if week_raw is None:
+        week_raw = current_parent.get("week_num")
+    week_num = int(week_raw) if week_raw else 1
+    week_num = max(1, min(week_num, 4))
+
+    generation_start_year = start_year
+    generation_start_month = start_month
+    if month_value and step in {3, 6, 12}:
+        normalized_month_value = ((month_value - 1) % step) + 1
+        gen_year = start_year
+        gen_month = normalized_month_value
+        while gen_year < start_year or (
+            gen_year == start_year and gen_month < start_month
+        ):
+            gen_year, gen_month = _next_month(gen_year, gen_month, step)
+        generation_start_year = gen_year
+        generation_start_month = gen_month
+
+    generated_months = _generate_months(
+        generation_start_year, generation_start_month, new_end_year, new_end_month, step
+    )
+    extension_months = [
+        (year, month)
+        for year, month in generated_months
+        if not _month_leq(year, month, old_end_year, old_end_month)
+    ]
+    if not extension_months:
+        return []
+
+    assignee_value = (
+        _format_assignees(update_data.get("assignee"))
+        if "assignee" in update_data and update_data.get("assignee") is not None
+        else current_parent.get("assignee")
+    )
+    status_value = (
+        _normalize_status(update_data.get("status"))
+        if "status" in update_data and update_data.get("status") is not None
+        else _normalize_status(current_parent.get("status"))
+    )
+    summary_value = (
+        update_data.get("summary")
+        if "summary" in update_data and update_data.get("summary") is not None
+        else current_parent.get("summary")
+    )
+    title_value = (
+        update_data.get("title")
+        if "title" in update_data and update_data.get("title") is not None
+        else current_parent.get("title")
+    )
+
+    extension_entries = []
+    for year, month in extension_months:
+        extension_entries.append(
+            {
+                "due_date": _nth_friday(year, month, week_num),
+                "title": title_value,
+                "assignee": assignee_value,
+                "status": status_value,
+                "summary": summary_value,
+            }
+        )
+    return extension_entries
+
+
+def _routine_child_columns():
+    columns = [
+        "task_no",
+        "routine_no",
+        "due_date",
+        "status",
+        "summary",
+    ]
+    if _routine_child_has_title_column():
+        columns.insert(3, "title")
+    if _routine_child_has_assignee_column():
+        columns.insert(3, "assignee")
+    return columns
+
+
 def _insert_entries(parent_entry, child_entries):
     parent_columns = [
         "frequency",
@@ -519,17 +654,7 @@ def _insert_entries(parent_entry, child_entries):
         "attachment_link",
         "summary",
     ]
-    child_columns = [
-        "task_no",
-        "routine_no",
-        "due_date",
-        "status",
-        "summary",
-    ]
-    if _routine_child_has_title_column():
-        child_columns.insert(3, "title")
-    if _routine_child_has_assignee_column():
-        child_columns.insert(3, "assignee")
+    child_columns = _routine_child_columns()
     parent_placeholders = ", ".join("?" for _ in parent_columns)
     parent_columns_sql = ", ".join(parent_columns)
     child_placeholders = ", ".join("?" for _ in child_columns)
@@ -793,16 +918,50 @@ def _update_parent(task_no, data):
         SET {', '.join(updates)}, updated_at = SYSUTCDATETIME()
         WHERE task_no = ?
     """
+    current_parent_query = """
+        SELECT
+            frequency,
+            start_month,
+            end_month,
+            month,
+            week_num,
+            assignee,
+            status,
+            summary,
+            title
+        FROM dbo.routine_task
+        WHERE task_no = ?
+          AND is_deleted = 0
+    """
     try:
         with _get_db_connection() as conn:
             cursor = conn.cursor()
+            cursor.execute(current_parent_query, [task_no])
+            current_row = cursor.fetchone()
+            if not current_row:
+                raise RuntimeError("Parent task not found")
+            current_parent = {
+                "frequency": current_row[0],
+                "start_month": current_row[1],
+                "end_month": current_row[2],
+                "month": current_row[3],
+                "week_num": current_row[4],
+                "assignee": current_row[5],
+                "status": current_row[6],
+                "summary": current_row[7],
+                "title": current_row[8],
+            }
+            requested_end_month = data.get("end_month")
+            if requested_end_month and current_parent.get("end_month"):
+                old_end_year, old_end_month = _parse_ym(current_parent["end_month"])
+                new_end_year, new_end_month = _parse_ym(requested_end_month)
+                if _month_leq(new_end_year, new_end_month, old_end_year, old_end_month) and (
+                    new_end_year != old_end_year or new_end_month != old_end_month
+                ):
+                    raise ValueError("終了月は現在の設定より前にはできません。")
+            extension_entries = _build_extension_child_entries(current_parent, data)
             if assignee_for_validation is not None:
-                cursor.execute(
-                    "SELECT assignee FROM dbo.routine_task WHERE task_no = ?",
-                    [task_no],
-                )
-                row = cursor.fetchone()
-                old_assignee = row[0] if row else None
+                old_assignee = current_parent.get("assignee")
                 if _routine_child_has_assignee_column():
                     if apply_assignee_to_routines:
                         cursor.execute(
@@ -826,6 +985,26 @@ def _update_parent(task_no, data):
                             [old_assignee, task_no],
                         )
             cursor.execute(query, params)
+            if extension_entries:
+                cursor.execute(
+                    "SELECT COALESCE(MAX(routine_no), 0) FROM dbo.routine_task_child WHERE task_no = ?",
+                    [task_no],
+                )
+                max_row = cursor.fetchone()
+                next_routine_no = (max_row[0] if max_row and max_row[0] is not None else 0) + 1
+                child_columns = _routine_child_columns()
+                child_placeholders = ", ".join("?" for _ in child_columns)
+                child_columns_sql = ", ".join(child_columns)
+                child_query = (
+                    f"INSERT INTO dbo.routine_task_child ({child_columns_sql}) "
+                    f"VALUES ({child_placeholders})"
+                )
+                payload_rows = []
+                for entry in extension_entries:
+                    row_payload = {"task_no": task_no, "routine_no": next_routine_no, **entry}
+                    payload_rows.append([row_payload[col] for col in child_columns])
+                    next_routine_no += 1
+                cursor.executemany(child_query, payload_rows)
             conn.commit()
     except pyodbc.Error as exc:
         raise RuntimeError("Failed to update parent task") from exc
