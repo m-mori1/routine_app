@@ -439,6 +439,12 @@
     #routine-table td:nth-child(10) {
       text-align: center !important;
     }
+    #routine-table th:nth-child(6),
+    #routine-table td:nth-child(6) {
+      text-align: center !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
     /* Routine table width overrides */
     #routine-table td:first-child,
     #routine-table th:first-child {
@@ -1898,7 +1904,7 @@
       let parentKindFilter = "all";
       let parentTitleFilter = "";
       let routinePage = 1;
-      const routinePageSize = 20;
+      const routinePageSize = 100;
       let routineHasNext = false;
       let routineHasPrev = false;
       let routineKindFilter = "all";
@@ -2264,7 +2270,7 @@
       }
 
       function showScreen(name, options = {}) {
-        const { updateUrl = true } = options;
+        const { updateUrl = true, loadData = true } = options;
         Object.entries(screens).forEach(([key, el]) => {
           el.classList.toggle("hidden", key !== name);
         });
@@ -2286,6 +2292,14 @@
         }
         if (updateUrl) {
           updateScreenUrl(name);
+        }
+        if (loadData) {
+          if (name === "parents" && parentCache.length === 0) {
+            fetchParents();
+          }
+          if (name === "routines" && routineCache.length === 0) {
+            fetchRoutines();
+          }
         }
       }
 
@@ -2328,35 +2342,40 @@ async function fetchParents(filters = {}) {
 async function fetchRoutines() {
         setStatus("Loading routines...");
         try {
-          const merged = [];
-          let page = 1;
-          while (true) {
-            const routinesUrl = new URL(routinesEndpoint);
-            if (routineKindFilter && routineKindFilter !== "all") {
-              routinesUrl.searchParams.set("task_kind", routineKindFilter);
-            }
-            routinesUrl.searchParams.set("page", page);
-            routinesUrl.searchParams.set("page_size", "100");
-            const response = await fetch(routinesUrl, { cache: "no-store" });
-            if (!response.ok) {
-              throw new Error(`API error ${response.status}`);
-            }
-            const payload = await response.json();
-            merged.push(...(payload.routines || []));
-            const hasNext = Boolean(payload.pagination?.has_next);
-            if (!hasNext) {
-              break;
-            }
-            page += 1;
+          const routinesUrl = new URL(routinesEndpoint);
+          if (routineKindFilter && routineKindFilter !== "all") {
+            routinesUrl.searchParams.set("task_kind", routineKindFilter);
           }
-
-          routineCache = merged;
+          if (selectedParentId) {
+            routinesUrl.searchParams.set("task_no", String(selectedParentId));
+          }
+          const yearValue = routineFilterInputs.year?.value?.trim() || "";
+          const monthValue = routineFilterInputs.month?.value?.trim() || "";
+          const assigneeValue = routineFilterInputs.assignee?.value?.trim() || "";
+          const titleValue = routineFilterInputs.title?.value?.trim() || "";
+          if (yearValue) {
+            routinesUrl.searchParams.set("year", yearValue);
+          }
+          if (monthValue) {
+            routinesUrl.searchParams.set("month", monthValue);
+          }
+          if (assigneeValue) {
+            routinesUrl.searchParams.set("assignee", assigneeValue);
+          }
+          if (titleValue) {
+            routinesUrl.searchParams.set("title", titleValue);
+          }
+          routinesUrl.searchParams.set("include_past_incomplete", "1");
+          routinesUrl.searchParams.set("page", String(routinePage));
+          routinesUrl.searchParams.set("page_size", String(routinePageSize));
+          const response = await fetch(routinesUrl, { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error(`API error ${response.status}`);
+          }
+          const payload = await response.json();
+          routineCache = payload.routines || [];
           renderRoutines(routineCache);
-          updateRoutinePaginationControls({
-            page: 1,
-            has_prev: false,
-            has_next: false,
-          });
+          updateRoutinePaginationControls(payload.pagination || {});
           setStatus("");
         } catch (error) {
           setStatus(`Failed to load routines: ${error.message}`);
@@ -2366,13 +2385,7 @@ async function fetchRoutines() {
 
 function renderParents(parents) {
         parentTableBody.innerHTML = "";
-        const keyword = parentTitleFilter.toLowerCase();
-        const filteredParents = keyword
-          ? parents.filter((parent) =>
-              String(parent?.title || "").toLowerCase().includes(keyword)
-            )
-          : parents;
-        const sortedParents = sortByState(filteredParents, parentSortState);
+        const sortedParents = sortByState(parents, parentSortState);
         if (!sortedParents.length) {
           parentTableBody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#64748b; padding:16px;">該当データがありません</td></tr>`;
           return;
@@ -2732,6 +2745,9 @@ function renderParents(parents) {
         updateParentSelectionUI();
         if (options.jumpToRoutines) {
           showScreen("routines");
+          routinePage = 1;
+          fetchRoutines();
+          return;
         }
         renderRoutines(routineCache);
       }
@@ -3471,19 +3487,22 @@ function renderParents(parents) {
 
       routineFilterBtn.addEventListener("click", () => {
         selectParent(null);
-        renderRoutines(routineCache);
+        routinePage = 1;
+        fetchRoutines();
       });
       routineFilterInputs.title?.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
           event.preventDefault();
           selectParent(null);
-          renderRoutines(routineCache);
+          routinePage = 1;
+          fetchRoutines();
         }
       });
       routineClearBtn.addEventListener("click", () => {
         selectParent(null);
         setRoutineFilterDefaults();
-        renderRoutines(routineCache);
+        routinePage = 1;
+        fetchRoutines();
       });
 
       parentPaginationPrev?.addEventListener("click", () => {
@@ -3607,8 +3626,6 @@ function renderParents(parents) {
         updateRoutineFilterAssigneeOptions();
         applyParentKindTabState();
         applyRoutineKindTabState();
-        fetchParents();
-        fetchRoutines();
         loadOrganizationUsers()
           .catch(() => {})
           .finally(() => loadAssignee());

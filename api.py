@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+﻿from datetime import date, datetime, timedelta, timezone
 import calendar
 import os
 import sys
@@ -25,13 +25,14 @@ ENTRA_TENANT_ID = os.environ.get("ENTRA_TENANT_ID", "")
 ENTRA_SCOPES = os.environ.get("ENTRA_SCOPES", "User.Read").split()
 ENTRA_AUTHORITY = f"https://login.microsoftonline.com/{ENTRA_TENANT_ID}" if ENTRA_TENANT_ID else ""
 FALLBACK_DEPARTMENT_CD = os.environ.get("FALLBACK_DEPARTMENT_CD", "D000013")
-FALLBACK_DEPARTMENT_NAME = os.environ.get("FALLBACK_DEPARTMENT_NAME", "システム")
+FALLBACK_DEPARTMENT_NAME = os.environ.get("FALLBACK_DEPARTMENT_NAME", "繧ｷ繧ｹ繝・Β")
 E2E_AUTH_BYPASS = os.environ.get("ROUTINE_E2E_BYPASS_AUTH", "0") == "1"
 E2E_TEST_UPN = os.environ.get("ROUTINE_E2E_TEST_UPN", "m-mori")
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
 _ROUTINE_CHILD_HAS_ASSIGNEE_COLUMN = None
 _ROUTINE_CHILD_HAS_TITLE_COLUMN = None
+_ROUTINE_CHILD_HAS_STATUS_COLUMN = None
 JST = timezone(timedelta(hours=9))
 
 
@@ -72,6 +73,22 @@ def _routine_child_has_title_column():
     except pyodbc.Error:
         _ROUTINE_CHILD_HAS_TITLE_COLUMN = False
     return _ROUTINE_CHILD_HAS_TITLE_COLUMN
+
+
+def _routine_child_has_status_column():
+    global _ROUTINE_CHILD_HAS_STATUS_COLUMN
+    if _ROUTINE_CHILD_HAS_STATUS_COLUMN is not None:
+        return _ROUTINE_CHILD_HAS_STATUS_COLUMN
+    query = "SELECT COL_LENGTH('dbo.routine_task_child', 'status')"
+    try:
+        with _get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query)
+            row = cursor.fetchone()
+            _ROUTINE_CHILD_HAS_STATUS_COLUMN = bool(row and row[0] is not None)
+    except pyodbc.Error:
+        _ROUTINE_CHILD_HAS_STATUS_COLUMN = False
+    return _ROUTINE_CHILD_HAS_STATUS_COLUMN
 
 
 def _parse_pagination_params(query_params, default_page_size):
@@ -283,13 +300,13 @@ def _normalize_status(value):
         "未対応": "未着手",
         "未着手": "未着手",
         "pending": "未着手",
-        "着手": "着手",
-        "処理中": "着手",
-        "進行中": "着手",
-        "in_progress": "着手",
+        "進行中": "進行中",
+        "作業中": "進行中",
+        "対応中": "進行中",
+        "in_progress": "進行中",
         "完了": "完了",
         "completed": "完了",
-        "??": "完了",
+        "done": "完了",
     }
     return mapping.get(normalized, normalized)
 
@@ -308,16 +325,16 @@ def _normalize_task_kind(value, assignee_value=None):
     normalized = str(value).strip() if value is not None else ""
     if normalized in {"グループ", "group", "Group"}:
         return "グループ"
-    if normalized in {"個人", "individual", "Individual"}:
-        return "個人"
+    if normalized in {"蛟倶ｺｺ", "individual", "Individual"}:
+        return "蛟倶ｺｺ"
     assignees = _parse_assignees(assignee_value)
-    return "グループ" if len(assignees) > 1 else "個人"
+    return "グループ" if len(assignees) > 1 else "蛟倶ｺｺ"
 
 
 def _validate_task_kind_assignees(task_kind, assignee_value):
     assignees = _parse_assignees(assignee_value)
     if task_kind == "グループ" and len(assignees) < 2:
-        raise ValueError("タスク区分がグループの場合、担当者は2名以上を選択してください")
+        raise ValueError("繧ｿ繧ｹ繧ｯ蛹ｺ蛻・′繧ｰ繝ｫ繝ｼ繝励・蝣ｴ蜷医∵球蠖楢・・2蜷堺ｻ･荳翫ｒ驕ｸ謚槭＠縺ｦ縺上□縺輔＞")
 
 
 def _fetch_parent_task_kind(task_no):
@@ -348,7 +365,7 @@ def _build_entries(data, registrant, department_cd=None):
         "スポット",
         "spot",
         "Spot",
-        "週次",
+        "騾ｱ谺｡",
         "weekly",
         "Weekly",
     }
@@ -504,11 +521,11 @@ def _build_entries(data, registrant, department_cd=None):
 def _routine_frequency_step(frequency):
     normalized_freq = (frequency or "").strip()
     step_map = {
-        "週次": 1,
-        "月次": 1,
+        "騾ｱ谺｡": 1,
+        "譛域ｬ｡": 1,
         "四半期": 3,
-        "半期": 6,
-        "年次": 12,
+        "蜊頑悄": 6,
+        "蟷ｴ谺｡": 12,
         "weekly": 1,
         "monthly": 1,
         "quarterly": 3,
@@ -624,9 +641,10 @@ def _routine_child_columns():
         "task_no",
         "routine_no",
         "due_date",
-        "status",
         "summary",
     ]
+    if _routine_child_has_status_column():
+        columns.insert(3, "status")
     if _routine_child_has_title_column():
         columns.insert(3, "title")
     if _routine_child_has_assignee_column():
@@ -689,11 +707,12 @@ def _insert_entries(parent_entry, child_entries):
         raise RuntimeError(f"Failed to insert tasks into the database: {exc}") from exc
 
 
-def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, task_kind=None):
+def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
     page = max(1, page)
     page_size = max(1, min(page_size, MAX_PAGE_SIZE))
     offset = (page - 1) * page_size
     limit = page_size + 1
+    filters = filters or {}
     conds = [
         "p.is_deleted = 0",
         "c.is_deleted = 0",
@@ -701,12 +720,60 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, task_kind=None):
         "(c.deleted_at IS NULL OR c.deleted_at > SYSUTCDATETIME())",
     ]
     params = []
+    task_kind = filters.get("task_kind")
     if task_kind:
         normalized_kind = _normalize_task_kind(task_kind)
         conds.append("p.task_kind = ?")
         params.append(normalized_kind)
+    task_no = filters.get("task_no")
+    if task_no is not None and str(task_no).strip():
+        conds.append("c.task_no = ?")
+        params.append(int(task_no))
+    child_assignee_where_sql = "c.assignee" if _routine_child_has_assignee_column() else "p.assignee"
+    child_title_where_sql = "c.title" if _routine_child_has_title_column() else "p.title"
+    assignee = filters.get("assignee")
+    if assignee:
+        conds.append(
+            f"(COALESCE({child_assignee_where_sql}, p.assignee, '') LIKE ? OR COALESCE(p.registrant, '') LIKE ?)"
+        )
+        like_value = f"%{assignee}%"
+        params.extend([like_value, like_value])
+    title = filters.get("title")
+    if title:
+        conds.append(f"COALESCE({child_title_where_sql}, p.title, '') LIKE ?")
+        params.append(f"%{title}%")
+    year = filters.get("year")
+    month = filters.get("month")
+    include_past_incomplete = bool(filters.get("include_past_incomplete", True))
+    has_status_col = _routine_child_has_status_column()
+    if year and month:
+        year_num = int(year)
+        month_num = int(month)
+        filter_month_start = date(year_num, month_num, 1)
+        if include_past_incomplete:
+            status_expr = "c.status" if has_status_col else "p.status"
+            conds.append(
+                f"""
+                (
+                    (YEAR(c.due_date) = ? AND MONTH(c.due_date) = ?)
+                    OR
+                    (c.due_date < ? AND COALESCE({status_expr}, '') <> N'完了')
+                )
+                """
+            )
+            params.extend([year_num, month_num, filter_month_start])
+        else:
+            conds.append("YEAR(c.due_date) = ? AND MONTH(c.due_date) = ?")
+            params.extend([year_num, month_num])
+    elif year:
+        conds.append("YEAR(c.due_date) = ?")
+        params.append(int(year))
+    elif month:
+        conds.append("MONTH(c.due_date) = ?")
+        params.append(int(month))
     child_assignee_sql = "c.assignee" if _routine_child_has_assignee_column() else "p.assignee"
     child_title_sql = "c.title" if _routine_child_has_title_column() else "p.title"
+    child_status_sql = "c.status" if _routine_child_has_status_column() else "NULL"
     try:
         with _get_db_connection() as conn:
             cursor = conn.cursor()
@@ -728,7 +795,7 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, task_kind=None):
                     {child_assignee_sql} AS assignee,
                     p.task_kind,
                     p.registrant,
-                    c.status,
+                    {child_status_sql} AS status,
                     {child_title_sql} AS title,
                     p.attachment_link,
                     p.summary AS parent_summary,
@@ -736,7 +803,7 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, task_kind=None):
                 FROM dbo.routine_task_child c
                 INNER JOIN dbo.routine_task p ON c.task_no = p.task_no
                 WHERE {" AND ".join(conds)}
-                ORDER BY p.start_month DESC, p.task_no DESC, c.routine_no
+                ORDER BY c.due_date ASC, c.task_no ASC, c.routine_no ASC
                 OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
                 """,
                 params + [offset, limit],
@@ -779,12 +846,16 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, task_kind=None):
                 tasks.append(record)
             return tasks, has_next
     except pyodbc.Error as exc:
-        raise RuntimeError("Failed to fetch routines from the database") from exc
+        raise RuntimeError(f"Failed to fetch routines from the database: {exc}") from exc
 
 
 def _fetch_parent_tasks(filters, page=1, page_size=DEFAULT_PAGE_SIZE):
     conds = ["is_deleted = 0"]
     params = []
+    title = filters.get("title")
+    if title:
+        conds.append("title LIKE ?")
+        params.append(f"%{title}%")
     assignee = filters.get("assignee")
     if assignee:
         conds.append("assignee LIKE ?")
@@ -904,11 +975,11 @@ def _update_parent(task_no, data):
         updates.append("half_year = ?")
         params.append(derived_half_year)
     if "assignee" in data and data.get("assignee") is not None and "task_kind" not in data:
-        task_kind_for_validation = _fetch_parent_task_kind(task_no) or "個人"
+        task_kind_for_validation = _fetch_parent_task_kind(task_no) or "蛟倶ｺｺ"
         updates.append("task_kind = ?")
         params.append(task_kind_for_validation)
     if assignee_for_validation is not None:
-        task_kind_to_check = task_kind_for_validation or _fetch_parent_task_kind(task_no) or "個人"
+        task_kind_to_check = task_kind_for_validation or _fetch_parent_task_kind(task_no) or "蛟倶ｺｺ"
         _validate_task_kind_assignees(task_kind_to_check, assignee_for_validation)
     if not updates:
         return
@@ -1015,7 +1086,7 @@ def _complete_task(task_no):
         UPDATE dbo.routine_task
         SET is_deleted = 1,
             deleted_at = SYSUTCDATETIME(),
-            status = '完了'
+            status = '螳御ｺ・
         WHERE task_no = ?
           AND is_deleted = 0
     """
@@ -1037,18 +1108,21 @@ def _complete_task(task_no):
 
 
 def _update_child(record_no, data):
-    allowed = ["due_date", "status", "summary"]
+    allowed = ["due_date", "summary"]
+    has_child_status = _routine_child_has_status_column()
+    if has_child_status:
+        allowed.insert(1, "status")
     has_child_title = _routine_child_has_title_column()
     if "title" in data and not has_child_title:
         raise ValueError(
-            "ルーチンタイトルの個別更新にはDB列が必要です。routine_task_child.title を追加してください"
+            "繝ｫ繝ｼ繝√Φ繧ｿ繧､繝医Ν縺ｮ蛟句挨譖ｴ譁ｰ縺ｫ縺ｯDB蛻励′蠢・ｦ√〒縺吶Ｓoutine_task_child.title 繧定ｿｽ蜉縺励※縺上□縺輔＞"
         )
     if has_child_title:
         allowed.insert(1, "title")
     has_child_assignee = _routine_child_has_assignee_column()
     if "assignee" in data and not has_child_assignee:
         raise ValueError(
-            "ルーチン担当者の個別更新にはDB列が必要です。routine_task_child.assignee を追加してください"
+            "繝ｫ繝ｼ繝√Φ諡・ｽ楢・・蛟句挨譖ｴ譁ｰ縺ｫ縺ｯDB蛻励′蠢・ｦ√〒縺吶Ｓoutine_task_child.assignee 繧定ｿｽ蜉縺励※縺上□縺輔＞"
         )
     if has_child_assignee:
         allowed.insert(1, "assignee")
@@ -1085,7 +1159,7 @@ def _complete_routine(record_no):
         UPDATE dbo.routine_task_child
         SET is_deleted = 1,
             deleted_at = SYSUTCDATETIME(),
-            status = '完了'
+            status = '螳御ｺ・
         OUTPUT INSERTED.task_no
         WHERE record_no = ?
           AND is_deleted = 0
@@ -1109,7 +1183,7 @@ def _complete_routine(record_no):
                     UPDATE dbo.routine_task
                     SET is_deleted = 1,
                         deleted_at = SYSUTCDATETIME(),
-                        status = '完了'
+                        status = '螳御ｺ・
                     WHERE task_no = ?
                       AND is_deleted = 0
                     """,
@@ -1202,22 +1276,43 @@ def create_app():
     @app.route("/auth/redirect")
     @app.route("/routine_app/auth/redirect")
     def auth_redirect():
+        if session.get("user"):
+            return redirect(url_for("serve_index"))
         flow = session.get("auth_flow")
         if not flow:
             return redirect(url_for("login"))
+        auth_code = request.args.get("code")
+        if auth_code and session.get("last_auth_code") == auth_code:
+            return redirect(url_for("serve_index"))
         cache = msal.SerializableTokenCache()
         msal_app = _build_msal_app(cache=cache)
         try:
             result = msal_app.acquire_token_by_auth_code_flow(flow, request.args)
         except ValueError as exc:
             app.logger.error("Auth flow failed", exc_info=exc)
-            return jsonify({"message": "認証フローに失敗しました"}), 400
+            session.pop("auth_flow", None)
+            session.pop("last_auth_code", None)
+            return redirect(url_for("login"))
         session.pop("auth_flow", None)
         if "error" in result:
             app.logger.error("Auth error", result)
-            return jsonify({"message": result.get('error_description')}), 401
-        session["user"] = result.get("id_token_claims")
-        session["access_token"] = result.get("access_token")
+            error_description = result.get("error_description", "") or ""
+            if "AADSTS54005" in error_description:
+                return redirect(url_for("serve_index"))
+            return jsonify({"message": error_description}), 401
+        if auth_code:
+            session["last_auth_code"] = auth_code
+        claims = result.get("id_token_claims") or {}
+        # Keep session cookie small; large claim sets can break login persistence.
+        session["user"] = {
+            "preferred_username": claims.get("preferred_username"),
+            "upn": claims.get("upn"),
+            "email": claims.get("email"),
+            "name": claims.get("name"),
+            "oid": claims.get("oid"),
+            "tid": claims.get("tid"),
+        }
+        session.pop("access_token", None)
         return redirect(url_for("serve_index"))
 
     @app.route("/logout")
@@ -1227,8 +1322,8 @@ def create_app():
         return redirect(url_for("login"))
 
 
-    def _build_routines_payload(page=1, page_size=DEFAULT_PAGE_SIZE, task_kind=None):
-        routines, has_next = _fetch_tasks(page=page, page_size=page_size, task_kind=task_kind)
+    def _build_routines_payload(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
+        routines, has_next = _fetch_tasks(page=page, page_size=page_size, filters=filters)
         pagination = {
             "page": page,
             "page_size": page_size,
@@ -1256,12 +1351,13 @@ def create_app():
         user_context = _current_user_context()
         parent_entry, entries = _build_entries(data, registrant, user_context.get("department_cd"))
         _insert_entries(parent_entry, entries)
-        return jsonify({"message": "登録しました", "task_count": len(entries)}), 201
+        return jsonify({"message": "逋ｻ骭ｲ縺励∪縺励◆", "task_count": len(entries)}), 201
     @app.route("/api.py/parents", methods=["GET"])
     @app.route("/routine_app/api.py/parents", methods=["GET"])
     def parent_tasks_route():
         try:
             filters = {
+                "title": request.args.get("title"),
                 "assignee": request.args.get("assignee"),
                 "registrant": request.args.get("registrant"),
                 "start_from": request.args.get("start_from"),
@@ -1335,8 +1431,18 @@ def create_app():
     def get_routines_route():
         try:
             page, page_size = _parse_pagination_params(request.args, DEFAULT_PAGE_SIZE)
-            task_kind = request.args.get("task_kind")
-            return jsonify(_build_routines_payload(page, page_size, task_kind=task_kind))
+            filters = {
+                "task_kind": request.args.get("task_kind"),
+                "year": request.args.get("year"),
+                "month": request.args.get("month"),
+                "assignee": request.args.get("assignee"),
+                "title": request.args.get("title"),
+                "task_no": request.args.get("task_no"),
+                "include_past_incomplete": request.args.get("include_past_incomplete", "1") != "0",
+            }
+            return jsonify(_build_routines_payload(page, page_size, filters=filters))
+        except ValueError as exc:
+            return jsonify({"message": str(exc)}), 400
         except RuntimeError as exc:
             app.logger.exception("DB retrieval failed")
             return jsonify({"message": str(exc)}), 500
@@ -1353,7 +1459,7 @@ def create_app():
             return jsonify({"message": str(exc)}), 500
         except pyodbc.Error:
             app.logger.exception("DB write error")
-            return jsonify({"message": "DBへの登録に失敗しました"}), 500
+            return jsonify({"message": "DB縺ｸ縺ｮ逋ｻ骭ｲ縺ｫ螟ｱ謨励＠縺ｾ縺励◆"}), 500
 
     @app.route("/api.py/current-user", methods=["GET"])
     @app.route("/routine_app/api.py/current-user", methods=["GET"])
@@ -1418,4 +1524,5 @@ def create_app():
 if __name__ == "__main__":
     app = create_app()
     app.run(host="0.0.0.0", port=5000, debug=True)
+
 
