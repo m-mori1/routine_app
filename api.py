@@ -25,7 +25,7 @@ ENTRA_TENANT_ID = os.environ.get("ENTRA_TENANT_ID", "")
 ENTRA_SCOPES = os.environ.get("ENTRA_SCOPES", "User.Read").split()
 ENTRA_AUTHORITY = f"https://login.microsoftonline.com/{ENTRA_TENANT_ID}" if ENTRA_TENANT_ID else ""
 FALLBACK_DEPARTMENT_CD = os.environ.get("FALLBACK_DEPARTMENT_CD", "D000013")
-FALLBACK_DEPARTMENT_NAME = os.environ.get("FALLBACK_DEPARTMENT_NAME", "繧ｷ繧ｹ繝・Β")
+FALLBACK_DEPARTMENT_NAME = os.environ.get("FALLBACK_DEPARTMENT_NAME", "システム")
 E2E_AUTH_BYPASS = os.environ.get("ROUTINE_E2E_BYPASS_AUTH", "0") == "1"
 E2E_TEST_UPN = os.environ.get("ROUTINE_E2E_TEST_UPN", "m-mori")
 DEFAULT_PAGE_SIZE = 20
@@ -325,16 +325,16 @@ def _normalize_task_kind(value, assignee_value=None):
     normalized = str(value).strip() if value is not None else ""
     if normalized in {"グループ", "group", "Group"}:
         return "グループ"
-    if normalized in {"蛟倶ｺｺ", "individual", "Individual"}:
-        return "蛟倶ｺｺ"
+    if normalized in {"個人", "individual", "Individual"}:
+        return "個人"
     assignees = _parse_assignees(assignee_value)
-    return "グループ" if len(assignees) > 1 else "蛟倶ｺｺ"
+    return "グループ" if len(assignees) > 1 else "個人"
 
 
 def _validate_task_kind_assignees(task_kind, assignee_value):
     assignees = _parse_assignees(assignee_value)
     if task_kind == "グループ" and len(assignees) < 2:
-        raise ValueError("繧ｿ繧ｹ繧ｯ蛹ｺ蛻・′繧ｰ繝ｫ繝ｼ繝励・蝣ｴ蜷医∵球蠖楢・・2蜷堺ｻ･荳翫ｒ驕ｸ謚槭＠縺ｦ縺上□縺輔＞")
+        raise ValueError("タスク区分がグループの場合は担当者を2人以上選択してください。")
 
 
 def _fetch_parent_task_kind(task_no):
@@ -365,7 +365,7 @@ def _build_entries(data, registrant, department_cd=None):
         "スポット",
         "spot",
         "Spot",
-        "騾ｱ谺｡",
+        "週次",
         "weekly",
         "Weekly",
     }
@@ -521,8 +521,8 @@ def _build_entries(data, registrant, department_cd=None):
 def _routine_frequency_step(frequency):
     normalized_freq = (frequency or "").strip()
     step_map = {
-        "騾ｱ谺｡": 1,
-        "譛域ｬ｡": 1,
+        "週次": 1,
+        "月次": 1,
         "四半期": 3,
         "蜊頑悄": 6,
         "蟷ｴ谺｡": 12,
@@ -975,11 +975,11 @@ def _update_parent(task_no, data):
         updates.append("half_year = ?")
         params.append(derived_half_year)
     if "assignee" in data and data.get("assignee") is not None and "task_kind" not in data:
-        task_kind_for_validation = _fetch_parent_task_kind(task_no) or "蛟倶ｺｺ"
+        task_kind_for_validation = _fetch_parent_task_kind(task_no) or "個人"
         updates.append("task_kind = ?")
         params.append(task_kind_for_validation)
     if assignee_for_validation is not None:
-        task_kind_to_check = task_kind_for_validation or _fetch_parent_task_kind(task_no) or "蛟倶ｺｺ"
+        task_kind_to_check = task_kind_for_validation or _fetch_parent_task_kind(task_no) or "個人"
         _validate_task_kind_assignees(task_kind_to_check, assignee_for_validation)
     if not updates:
         return
@@ -1086,7 +1086,7 @@ def _complete_task(task_no):
         UPDATE dbo.routine_task
         SET is_deleted = 1,
             deleted_at = SYSUTCDATETIME(),
-            status = '螳御ｺ・
+    status = '完了'
         WHERE task_no = ?
           AND is_deleted = 0
     """
@@ -1115,14 +1115,14 @@ def _update_child(record_no, data):
     has_child_title = _routine_child_has_title_column()
     if "title" in data and not has_child_title:
         raise ValueError(
-            "繝ｫ繝ｼ繝√Φ繧ｿ繧､繝医Ν縺ｮ蛟句挨譖ｴ譁ｰ縺ｫ縺ｯDB蛻励′蠢・ｦ√〒縺吶Ｓoutine_task_child.title 繧定ｿｽ蜉縺励※縺上□縺輔＞"
+            "ルーチンタイトルの個別更新にはDB列が必要です。routine_task_child.title を追加してください"
         )
     if has_child_title:
         allowed.insert(1, "title")
     has_child_assignee = _routine_child_has_assignee_column()
     if "assignee" in data and not has_child_assignee:
         raise ValueError(
-            "繝ｫ繝ｼ繝√Φ諡・ｽ楢・・蛟句挨譖ｴ譁ｰ縺ｫ縺ｯDB蛻励′蠢・ｦ√〒縺吶Ｓoutine_task_child.assignee 繧定ｿｽ蜉縺励※縺上□縺輔＞"
+            "ルーチン担当者の個別更新にはDB列が必要です。routine_task_child.assignee を追加してください"
         )
     if has_child_assignee:
         allowed.insert(1, "assignee")
@@ -1159,7 +1159,7 @@ def _complete_routine(record_no):
         UPDATE dbo.routine_task_child
         SET is_deleted = 1,
             deleted_at = SYSUTCDATETIME(),
-            status = '螳御ｺ・
+            status = '完了'
         OUTPUT INSERTED.task_no
         WHERE record_no = ?
           AND is_deleted = 0
@@ -1183,7 +1183,7 @@ def _complete_routine(record_no):
                     UPDATE dbo.routine_task
                     SET is_deleted = 1,
                         deleted_at = SYSUTCDATETIME(),
-                        status = '螳御ｺ・
+                        status = '完了'
                     WHERE task_no = ?
                       AND is_deleted = 0
                     """,
