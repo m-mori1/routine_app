@@ -187,7 +187,9 @@
       background: #fff;
       border-radius: 10px;
       border: 1px solid #d5d7db;
-      overflow-x: auto;
+      max-height: 72vh;
+      overflow: auto;
+      position: relative;
       box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
     }
     .table-footer {
@@ -259,6 +261,14 @@
     #parent-table th,
     #parent-table td {
       font-size: 0.85rem;
+    }
+    /* Keep list headers visible while page scrolling, regardless of theme. */
+    #parent-table thead th,
+    #routine-table thead th {
+      position: sticky !important;
+      top: 0;
+      z-index: 10;
+      background: #eef2f7;
     }
     :root {
       --list-col-divider: rgba(148, 163, 184, 0.35);
@@ -519,7 +529,8 @@
     #routine-table td:nth-child(11),
     #routine-table td:nth-child(12),
     #routine-table td:nth-child(14) {
-      padding-left: calc(14px - 1ch) !important;
+      padding-left: max(8px, calc(14px - 1ch)) !important;
+      padding-right: 8px !important;
     }
     #routine-table th:nth-child(12),
     #routine-table td:nth-child(12) {
@@ -611,7 +622,8 @@
     #parent-table td:nth-child(8),
     #parent-table td:nth-child(9),
     #parent-table td:nth-child(10) {
-      padding-left: calc(14px - 1ch) !important;
+      padding-left: max(8px, calc(14px - 1ch)) !important;
+      padding-right: 8px !important;
     }
     #parent-table td:nth-child(10),
     #routine-table td:nth-child(14) {
