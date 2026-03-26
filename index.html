@@ -2507,7 +2507,7 @@ function renderParents(parents) {
 
       function compareSortValues(left, right, sortKey, sortDir) {
         const direction = sortDir === "desc" ? -1 : 1;
-        if (sortKey === "due_date") {
+        if (sortKey === "due_date" || sortKey === "planned_date") {
           const leftTime = left ? new Date(left).getTime() : Number.MAX_SAFE_INTEGER;
           const rightTime = right ? new Date(right).getTime() : Number.MAX_SAFE_INTEGER;
           const safeLeft = Number.isFinite(leftTime) ? leftTime : Number.MAX_SAFE_INTEGER;
@@ -2536,6 +2536,23 @@ function renderParents(parents) {
         return compared * direction;
       }
 
+      function compareFrequencyPriority(left, right) {
+        const normalizeFrequency = (value) => String(value ?? "").trim().toLowerCase();
+        const getRank = (value) => {
+          const normalized = normalizeFrequency(value);
+          if (normalized === "スポット" || normalized === "spot") {
+            return 0;
+          }
+          return 1;
+        };
+        const leftRank = getRank(left);
+        const rightRank = getRank(right);
+        if (leftRank !== rightRank) {
+          return leftRank - rightRank;
+        }
+        return compareSortValues(left, right, "frequency", "asc");
+      }
+
       function sortByState(list, sortState) {
         if (!sortState?.key) {
           return [...list];
@@ -2544,6 +2561,24 @@ function renderParents(parents) {
           const primary = compareSortValues(a?.[sortState.key], b?.[sortState.key], sortState.key, sortState.dir);
           if (primary !== 0) {
             return primary;
+          }
+          if (sortState.key === "due_date") {
+            const plannedDateComparison = compareSortValues(
+              a?.planned_date,
+              b?.planned_date,
+              "planned_date",
+              "asc"
+            );
+            if (plannedDateComparison !== 0) {
+              return plannedDateComparison;
+            }
+            const frequencyComparison = compareFrequencyPriority(
+              a?.frequency,
+              b?.frequency
+            );
+            if (frequencyComparison !== 0) {
+              return frequencyComparison;
+            }
           }
           return compareSortValues(a?.task_no, b?.task_no, "task_no", "asc");
         });
