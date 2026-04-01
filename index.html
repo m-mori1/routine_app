@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%0A%20%20%3Ctext%20x%3D%2232%22%20y%3D%2256%22%20text-anchor%3D%22middle%22%20font-size%3D%2262%22%20font-weight%3D%22900%22%20fill%3D%22%23dc2626%22%20font-family%3D%22%27Yu%20Gothic%20UI%27%2C%27Meiryo%27%2Csans-serif%22%3E%26%2312479%3B%3C%2Ftext%3E%0A%3C%2Fsvg%3E" />
+  <link rel="shortcut icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%0A%20%20%3Ctext%20x%3D%2232%22%20y%3D%2256%22%20text-anchor%3D%22middle%22%20font-size%3D%2262%22%20font-weight%3D%22900%22%20fill%3D%22%23dc2626%22%20font-family%3D%22%27Yu%20Gothic%20UI%27%2C%27Meiryo%27%2Csans-serif%22%3E%26%2312479%3B%3C%2Ftext%3E%0A%3C%2Fsvg%3E" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%0A%20%20%3Ctext%20x%3D%2232%22%20y%3D%2256%22%20text-anchor%3D%22middle%22%20font-size%3D%2262%22%20font-weight%3D%22900%22%20fill%3D%22%23dc2626%22%20font-family%3D%22%27Yu%20Gothic%20UI%27%2C%27Meiryo%27%2Csans-serif%22%3E%26%2312479%3B%3C%2Ftext%3E%0A%3C%2Fsvg%3E" />
   <title>定常タスク管理ツール</title>
     <style>
     :root {
@@ -176,6 +179,16 @@
       padding: 4px 8px;
       font-size: 0.85rem;
     }
+    .parent-search-field select {
+      width: 170px;
+      min-width: 140px;
+      height: 30px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.85rem;
+      background: #fff;
+    }
     .filters label {
       display: flex;
       flex-direction: column;
@@ -232,6 +245,10 @@
       table-layout: fixed;
       border-collapse: separate;
       border-spacing: 0;
+    }
+    #routine-table {
+      width: max-content;
+      min-width: 2000px;
     }
     thead {
       background: #eef2f7;
@@ -439,6 +456,11 @@
     #routine-table th:nth-child(11) {
       white-space: nowrap;
     }
+    #routine-table td:nth-child(12),
+    #routine-table th:nth-child(12) {
+      white-space: nowrap;
+      word-break: normal;
+    }
     #routine-table td:nth-child(6),
     #routine-table td:nth-child(7),
     #routine-table td:nth-child(8),
@@ -448,6 +470,11 @@
     }
     #routine-table td:nth-child(10) {
       text-align: center !important;
+    }
+    #routine-table th:nth-child(10),
+    #routine-table td:nth-child(10) {
+      padding-left: 4px !important;
+      padding-right: 4px !important;
     }
     #routine-table th:nth-child(6),
     #routine-table td:nth-child(6) {
@@ -528,28 +555,35 @@
     }
     #routine-table td:nth-child(11),
     #routine-table td:nth-child(12),
-    #routine-table td:nth-child(14) {
+    #routine-table td:nth-child(13),
+    #routine-table td:nth-child(15) {
       padding-left: max(8px, calc(14px - 1ch)) !important;
       padding-right: 8px !important;
     }
     #routine-table th:nth-child(12),
     #routine-table td:nth-child(12) {
-      width: 20ch !important;
-      min-width: 20ch !important;
-      max-width: 20ch !important;
-    }
-    #routine-table th:nth-child(13),
-    #routine-table td:nth-child(13) {
       width: 7ch !important;
       min-width: 7ch !important;
       max-width: 7ch !important;
     }
     #routine-table th:nth-child(13),
     #routine-table td:nth-child(13) {
-      text-align: center;
+      width: 20ch !important;
+      min-width: 20ch !important;
+      max-width: 20ch !important;
     }
     #routine-table th:nth-child(14),
     #routine-table td:nth-child(14) {
+      width: 7ch !important;
+      min-width: 7ch !important;
+      max-width: 7ch !important;
+    }
+    #routine-table th:nth-child(14),
+    #routine-table td:nth-child(14) {
+      text-align: center;
+    }
+    #routine-table th:nth-child(15),
+    #routine-table td:nth-child(15) {
       width: 35ch !important;
       min-width: 35ch !important;
       max-width: 35ch !important;
@@ -626,7 +660,7 @@
       padding-right: 8px !important;
     }
     #parent-table td:nth-child(10),
-    #routine-table td:nth-child(14) {
+    #routine-table td:nth-child(15) {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -808,6 +842,16 @@
       grid-template-columns: repeat(2, minmax(200px, 1fr));
       align-items: start;
     }
+    #routine-edit-form .title-date-row {
+      grid-template-columns: minmax(260px, 1fr) 160px 160px;
+      align-items: end;
+    }
+    #routine-edit-form input[name="due_date"][readonly] {
+      background: #f3f4f6;
+      color: #6b7280;
+      border-color: #d1d5db;
+      cursor: not-allowed;
+    }
     #routine-edit-form .form-actions {
       margin-top: 8px;
       justify-content: flex-start;
@@ -824,6 +868,9 @@
         justify-content: flex-end;
       }
       #routine-edit-form .assignee-summary-row {
+        grid-template-columns: 1fr;
+      }
+      #routine-edit-form .title-date-row {
         grid-template-columns: 1fr;
       }
     }
@@ -1111,8 +1158,8 @@
     #routine-table td:nth-child(3),
     #routine-table th:nth-child(8),
     #routine-table td:nth-child(8),
-    #routine-table th:nth-child(13),
-    #routine-table td:nth-child(13) {
+    #routine-table th:nth-child(14),
+    #routine-table td:nth-child(14) {
       text-align: center !important;
       vertical-align: middle !important;
       padding-left: 0 !important;
@@ -1193,6 +1240,29 @@
       color: #7f1d1d;
       font-weight: 600;
     }
+    /* Final override for routine table column layout */
+    #routine-table th:nth-child(11),
+    #routine-table td:nth-child(11),
+    #routine-table th:nth-child(12),
+    #routine-table td:nth-child(12) {
+      width: 7ch !important;
+      min-width: 7ch !important;
+      max-width: 7ch !important;
+      text-align: center !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      word-break: normal !important;
+    }
+    #routine-table th:nth-child(13),
+    #routine-table td:nth-child(13) {
+      text-align: left !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+    }
   </style>
 </head>
 <!-- Revert quickly: remove `theme-modern` from body class -->
@@ -1222,6 +1292,10 @@
         <button type="button" class="active" data-kind-filter="all">全て</button>
         <button type="button" data-kind-filter="グループ">グループ</button>
         <button type="button" data-kind-filter="個人">個人</button>
+        <label class="parent-search-field">
+          担当者
+          <select id="parent-assignee-filter"></select>
+        </label>
         <label class="parent-search-field">
           タイトル検索
           <input id="parent-title-search" type="text" placeholder="部分一致" />
@@ -1306,6 +1380,7 @@
             <col style="width:4ch;" />
             <col style="width:4ch;" />
             <col style="width:7ch;" />
+            <col style="width:7ch;" />
             <col style="width:20ch;" />
             <col style="width:7ch;" />
             <col style="width:35ch;" />
@@ -1323,6 +1398,7 @@
               <th>月</th>
               <th>週</th>
               <th>期日</th>
+              <th>予定日</th>
               <th>担当者</th>
               <th>登録者</th>
               <th>備考</th>
@@ -1366,6 +1442,7 @@
               <option value="">選択</option>
               <option value="スポット">スポット</option>
               <option value="週次">週次</option>
+              <option value="隔月">隔月</option>
               <option value="月次">月次</option>
               <option value="四半期">四半期</option>
               <option value="半期">半期</option>
@@ -1490,16 +1567,20 @@
           <h2>ルーチン編集</h2>
           <form id="routine-edit-form">
             <input type="hidden" name="record_no" />
-            <div class="form-row two-column">
+	            <div class="form-row title-date-row">
               <label>
                 <span>タイトル</span>
                 <input type="text" name="title" />
               </label>
               <label>
                 <span>期日</span>
-                <input type="date" name="due_date" />
-              </label>
-            </div>
+	                <input type="date" name="due_date" readonly />
+	              </label>
+	              <label>
+	                <span>&#x4E88;&#x5B9A;&#x65E5;</span>
+	                <input type="date" name="planned_date" />
+	              </label>
+	            </div>
             <div class="form-row first-row">
               <label>
                 <span>年</span>
@@ -1748,6 +1829,7 @@
         assignee: document.querySelector("[name='filter-routine-assignee']"),
         title: document.getElementById("routine-title-search"),
       };
+      const parentAssigneeFilterSelect = document.getElementById("parent-assignee-filter");
       function buildRoutineFilterYearOptions() {
         const select = routineFilterInputs.year;
         if (!select) {
@@ -1775,6 +1857,26 @@
       }
       function updateRoutineFilterAssigneeOptions() {
         const select = routineFilterInputs.assignee;
+        if (!select) {
+          return;
+        }
+        const previousValue = select.value;
+        const names = Array.from(organizationUserNames).sort((a, b) =>
+          a.localeCompare(b)
+        );
+        const optionNodes = ["<option value=\"\">全員</option>"];
+        optionNodes.push(
+          ...names.map((name) => `<option value="${name}">${name}</option>`)
+        );
+        select.innerHTML = optionNodes.join("");
+        if (previousValue && names.includes(previousValue)) {
+          select.value = previousValue;
+        } else {
+          select.value = "";
+        }
+      }
+      function updateParentFilterAssigneeOptions() {
+        const select = parentAssigneeFilterSelect;
         if (!select) {
           return;
         }
@@ -1857,6 +1959,8 @@
       const routineEditMessage = document.getElementById("routine-edit-message");
       const routineEditAssigneeList = document.getElementById("routine-edit-assignee-list");
       const routineEditTitleInput = routineEditForm.querySelector('[name="title"]');
+      const routineEditDueDateInput = routineEditForm.querySelector('[name="due_date"]');
+      const routineEditPlannedDateInput = routineEditForm.querySelector('[name="planned_date"]');
       const routineEditYearInput = routineEditForm.querySelector('[name="edit_year"]');
       const routineEditHalfSelect = routineEditForm.querySelector('[name="edit_half_year"]');
       const routineEditQuarterSelect = routineEditForm.querySelector('[name="edit_quarter"]');
@@ -1910,11 +2014,12 @@
       let editingParentOriginalAssignee = "";
       let editingParentOriginalEndMonth = "";
       let parentPage = 1;
-      const parentPageSize = 20;
+      const parentPageSize = 100;
       let parentHasNext = false;
       let parentHasPrev = false;
       let parentKindFilter = "all";
       let parentTitleFilter = "";
+      let parentAssigneeFilter = "";
       let routinePage = 1;
       const routinePageSize = 100;
       let routineHasNext = false;
@@ -1944,6 +2049,7 @@
         "month",
         "week_num",
         "due_date",
+        "planned_date",
         "assignee",
         "registrant",
         "summary",
@@ -1963,6 +2069,7 @@
       const frequencyLabels = {
         スポット: "スポット",
         週次: "週次",
+        隔月: "隔月",
         月次: "月次",
         四半期: "四半期",
         年次: "年次",
@@ -1990,6 +2097,16 @@
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#x27;");
+      }
+
+      function formatSummaryCell(value) {
+        const raw = value === undefined || value === null ? "" : String(value);
+        const trimmed = raw.trim();
+        if (/^https?:\/\/\S+$/i.test(trimmed)) {
+          const safeUrl = escapeHtml(trimmed);
+          return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`;
+        }
+        return escapeHtml(raw);
       }
 
       function formatFrequency(value) {
@@ -2234,6 +2351,7 @@
         employeeOnlyCandidateNames.forEach((name) => employeeOnlyUserNames.add(name));
         populateAssigneePickers(baseNames);
         updateRoutineFilterAssigneeOptions();
+        updateParentFilterAssigneeOptions();
       }
 
       async function loadOrganizationUsers() {
@@ -2334,9 +2452,16 @@ async function fetchParents(filters = {}) {
           if (parentTitleFilter) {
             url.searchParams.set("title", parentTitleFilter);
           }
+          if (parentAssigneeFilter) {
+            url.searchParams.set("assignee", parentAssigneeFilter);
+          }
           url.searchParams.set("page", parentPage);
           url.searchParams.set("page_size", parentPageSize);
           const response = await fetch(url, { cache: "no-store" });
+          if (response.redirected && /\/login(?:$|\?)/.test(response.url)) {
+            location.href = response.url;
+            return;
+          }
           if (!response.ok) {
             throw new Error(`APIエラー ${response.status}`);
           }
@@ -2381,6 +2506,10 @@ async function fetchRoutines() {
           routinesUrl.searchParams.set("page", String(routinePage));
           routinesUrl.searchParams.set("page_size", String(routinePageSize));
           const response = await fetch(routinesUrl, { cache: "no-store" });
+          if (response.redirected && /\/login(?:$|\?)/.test(response.url)) {
+            location.href = response.url;
+            return;
+          }
           if (!response.ok) {
             throw new Error(`API error ${response.status}`);
           }
@@ -2391,7 +2520,7 @@ async function fetchRoutines() {
           setStatus("");
         } catch (error) {
           setStatus(`Failed to load routines: ${error.message}`);
-          routineTableBody.innerHTML = `<tr><td colspan="13" style="text-align:center; color:#64748b; padding:16px;">Failed to load</td></tr>`;
+          routineTableBody.innerHTML = `<tr><td colspan="15" style="text-align:center; color:#64748b; padding:16px;">Failed to load</td></tr>`;
         }
       }
 
@@ -2424,7 +2553,7 @@ function renderParents(parents) {
             <td>${escapeHtml(parent.end_month)}</td>
             <td>${escapeHtml(parent.assignee)}</td>
             <td>${escapeHtml(parent.registrant || "")}</td>
-            <td>${escapeHtml(parent.summary || "")}</td>
+            <td>${formatSummaryCell(parent.summary || "")}</td>
           `;
           row.classList.toggle("selected-row", parent.task_no === selectedParentId);
           row.addEventListener("click", (event) => {
@@ -2466,6 +2595,7 @@ function renderParents(parents) {
       }
       function applyParentTitleSearch() {
         parentTitleFilter = (parentTitleSearchInput?.value || "").trim();
+        parentAssigneeFilter = (parentAssigneeFilterSelect?.value || "").trim();
         parentPage = 1;
         fetchParents();
       }
@@ -2502,7 +2632,18 @@ function renderParents(parents) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         due.setHours(0, 0, 0, 0);
-        return due.getTime() <= today.getTime();
+        if (due.getTime() <= today.getTime()) {
+          return true;
+        }
+        // Highlight rows in the current week as well (Mon-Sun).
+        const weekStart = new Date(today);
+        const dayFromMonday = (today.getDay() + 6) % 7;
+        weekStart.setDate(today.getDate() - dayFromMonday);
+        weekStart.setHours(0, 0, 0, 0);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+        return due.getTime() >= weekStart.getTime() && due.getTime() <= weekEnd.getTime();
       }
 
       function compareSortValues(left, right, sortKey, sortDir) {
@@ -2708,7 +2849,7 @@ function renderParents(parents) {
           });
         }
         if (!list.length) {
-          routineTableBody.innerHTML = `<tr><td colspan="14" style="text-align:center; color:#64748b; padding:16px;">該当データがありません</td></tr>`;
+          routineTableBody.innerHTML = `<tr><td colspan="15" style="text-align:center; color:#64748b; padding:16px;">該当データがありません</td></tr>`;
           return;
         }
         list.forEach((routine) => {
@@ -2731,9 +2872,10 @@ function renderParents(parents) {
             <td>${escapeHtml(routine.month)}</td>
             <td>${escapeHtml(routine.week_num)}</td>
             <td>${escapeHtml(formatDueDateCompact(routine.due_date))}</td>
+            <td>${escapeHtml(formatDueDateCompact(routine.planned_date || routine.due_date))}</td>
             <td>${escapeHtml(routine.assignee)}</td>
             <td>${escapeHtml(routine.registrant || "")}</td>
-            <td>${escapeHtml(routine.summary)}</td>
+            <td>${formatSummaryCell(routine.summary)}</td>
           `;
           row.addEventListener("click", (event) => {
             if (event.target.closest(".routine-complete-checkbox")) {
@@ -2818,7 +2960,7 @@ function renderParents(parents) {
             <td><input type="checkbox" class="routine-complete-checkbox" data-record-no="${routine.record_no}" /></td>
             <td>${escapeHtml(routine.routine_no)}</td>
             <td>${escapeHtml(formatDueDateCompact(routine.due_date))}</td>
-            <td>${escapeHtml(routine.summary)}</td>
+            <td>${formatSummaryCell(routine.summary)}</td>
           `;
           routineModalBody.appendChild(row);
         });
@@ -2912,7 +3054,9 @@ function renderParents(parents) {
           const yyyy = due.getFullYear();
           const mm = String(due.getMonth() + 1).padStart(2, "0");
           const dd = String(due.getDate()).padStart(2, "0");
-          routineEditForm.due_date.value = `${yyyy}-${mm}-${dd}`;
+          if (routineEditDueDateInput) {
+            routineEditDueDateInput.value = `${yyyy}-${mm}-${dd}`;
+          }
         };
         const syncRoutineEditHalfQuarterFromMonth = () => {
           const monthNum = Number(routineEditMonthSelect?.value);
@@ -2927,7 +3071,7 @@ function renderParents(parents) {
           }
         };
         const syncRoutineEditFromDueDate = () => {
-          const due = routineEditForm.due_date.value ? new Date(routineEditForm.due_date.value) : null;
+          const due = routineEditDueDateInput?.value ? new Date(routineEditDueDateInput.value) : null;
           if (!due || Number.isNaN(due.getTime())) {
             return;
           }
@@ -2989,10 +3133,15 @@ function renderParents(parents) {
             }
             syncRoutineEditDerivedFields();
           });
-          routineEditForm.due_date?.addEventListener("change", syncRoutineEditFromDueDate);
+          routineEditDueDateInput?.addEventListener("change", syncRoutineEditFromDueDate);
         }
         routineEditForm.record_no.value = routine.record_no;
-        routineEditForm.due_date.value = routine.due_date || "";
+        if (routineEditDueDateInput) {
+          routineEditDueDateInput.value = routine.due_date || "";
+        }
+        if (routineEditPlannedDateInput) {
+          routineEditPlannedDateInput.value = routine.planned_date || routine.due_date || "";
+        }
         if (routineEditTitleInput) {
           routineEditTitleInput.value = routine.title || "";
         }
@@ -3051,39 +3200,12 @@ function renderParents(parents) {
       routineEditForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const recordNo = Number(routineEditForm.record_no.value);
-        const editYear = Number(routineEditYearInput?.value);
-        const editMonth = Number(routineEditMonthSelect?.value);
-        const editWeek = Number(routineEditWeekSelect?.value);
-        if (
-          Number.isFinite(editYear) &&
-          Number.isFinite(editMonth) &&
-          Number.isFinite(editWeek) &&
-          editYear >= 1900 &&
-          editYear <= 2200 &&
-          editMonth >= 1 &&
-          editMonth <= 12 &&
-          editWeek >= 1 &&
-          editWeek <= 4
-        ) {
-          const firstDay = new Date(editYear, editMonth - 1, 1);
-          const delta = (5 - firstDay.getDay() + 7) % 7;
-          let day = 1 + delta + 7 * (editWeek - 1);
-          const lastDay = new Date(editYear, editMonth, 0).getDate();
-          if (day > lastDay) {
-            day = lastDay;
-          }
-          const computed = new Date(editYear, editMonth - 1, day);
-          const yyyy = computed.getFullYear();
-          const mm = String(computed.getMonth() + 1).padStart(2, "0");
-          const dd = String(computed.getDate()).padStart(2, "0");
-          routineEditForm.due_date.value = `${yyyy}-${mm}-${dd}`;
-        }
         try {
           await fetch(routineUpdate(recordNo), {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              due_date: routineEditForm.due_date.value || null,
+              planned_date: routineEditPlannedDateInput?.value || null,
               title: routineEditTitleInput?.value,
               assignee: routineEditAssigneeManager?.getAssignees(),
               summary: routineEditForm.summary.value,
@@ -3114,10 +3236,6 @@ function renderParents(parents) {
           return;
         }
         const selectedTaskKind = (taskKindSelect?.value || "").trim();
-        if (selectedTaskKind === "\u30b0\u30eb\u30fc\u30d7" && selectedAssignees.length < 2) {
-          formMessage.textContent = "\u30bf\u30b9\u30af\u533a\u5206\u304c\u30b0\u30eb\u30fc\u30d7\u306e\u5834\u5408\u3001\u62c5\u5f53\u8005\u306f2\u540d\u4ee5\u4e0a\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044\u3002";
-          return;
-        }
         let applyAssigneeToRoutines = true;
         if (updateTargetTaskNo) {
           const currentAssigneeText = selectedAssignees.join("; ");
@@ -3248,6 +3366,15 @@ function renderParents(parents) {
           quarter: false,
           month: false,
           week: false,
+          start: true,
+          end: true,
+          due: false,
+        },
+        隔月: {
+          half: false,
+          quarter: false,
+          month: true,
+          week: true,
           start: true,
           end: true,
           due: false,
@@ -3386,10 +3513,13 @@ function renderParents(parents) {
         setDefaultFormValues();
         frequencySelect.value = parent.frequency || "週次";
         updateFrequencyControls();
-        halfSelect.value = parent.half_year ? String(parent.half_year) : "";
-        quarterSelect.value = parent.quarter || "";
-        monthSelect.value = parent.month ? String(parent.month) : "";
-        weekSelect.value = parent.week_num ? String(parent.week_num) : "";
+        if (taskKindSelect) {
+          taskKindSelect.value = "個人";
+        }
+        halfSelect.value = halfSelect.disabled ? "" : (parent.half_year ? String(parent.half_year) : "");
+        quarterSelect.value = quarterSelect.disabled ? "" : (parent.quarter || "");
+        monthSelect.value = monthSelect.disabled ? "" : (parent.month ? String(parent.month) : "");
+        weekSelect.value = weekSelect.disabled ? "" : (parent.week_num ? String(parent.week_num) : "");
         startMonthInput.value = parent.start_month || "";
         if (halfSelect) {
           applyHalfFromStartMonth(startMonthInput.value);
@@ -3587,6 +3717,9 @@ function renderParents(parents) {
           applyParentTitleSearch();
         }
       });
+      parentAssigneeFilterSelect?.addEventListener("change", () => {
+        applyParentTitleSearch();
+      });
       routineKindTabButtons.forEach((button) => {
         button.addEventListener("click", () => {
           const nextFilter = button.dataset.routineKindFilter || "all";
@@ -3671,6 +3804,7 @@ function renderParents(parents) {
         buildRoutineFilterMonthOptions();
         setRoutineFilterDefaults();
         updateRoutineFilterAssigneeOptions();
+        updateParentFilterAssigneeOptions();
         applyParentKindTabState();
         applyRoutineKindTabState();
         loadOrganizationUsers()

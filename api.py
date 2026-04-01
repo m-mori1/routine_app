@@ -30,9 +30,14 @@ E2E_AUTH_BYPASS = os.environ.get("ROUTINE_E2E_BYPASS_AUTH", "0") == "1"
 E2E_TEST_UPN = os.environ.get("ROUTINE_E2E_TEST_UPN", "m-mori")
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
+
+STATUS_PENDING = "\u672a\u7740\u624b"
+STATUS_IN_PROGRESS = "\u9032\u884c\u4e2d"
+STATUS_DONE = "\u5b8c\u4e86"
 _ROUTINE_CHILD_HAS_ASSIGNEE_COLUMN = None
 _ROUTINE_CHILD_HAS_TITLE_COLUMN = None
 _ROUTINE_CHILD_HAS_STATUS_COLUMN = None
+_ROUTINE_CHILD_HAS_PLANNED_DATE_COLUMN = None
 JST = timezone(timedelta(hours=9))
 
 
@@ -89,6 +94,22 @@ def _routine_child_has_status_column():
     except pyodbc.Error:
         _ROUTINE_CHILD_HAS_STATUS_COLUMN = False
     return _ROUTINE_CHILD_HAS_STATUS_COLUMN
+
+
+def _routine_child_has_planned_date_column():
+    global _ROUTINE_CHILD_HAS_PLANNED_DATE_COLUMN
+    if _ROUTINE_CHILD_HAS_PLANNED_DATE_COLUMN is not None:
+        return _ROUTINE_CHILD_HAS_PLANNED_DATE_COLUMN
+    query = "SELECT COL_LENGTH('dbo.routine_task_child', 'planned_date')"
+    try:
+        with _get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query)
+            row = cursor.fetchone()
+            _ROUTINE_CHILD_HAS_PLANNED_DATE_COLUMN = bool(row and row[0] is not None)
+    except pyodbc.Error:
+        _ROUTINE_CHILD_HAS_PLANNED_DATE_COLUMN = False
+    return _ROUTINE_CHILD_HAS_PLANNED_DATE_COLUMN
 
 
 def _parse_pagination_params(query_params, default_page_size):
@@ -278,6 +299,13 @@ def _nth_friday(year, month, week_num):
     return date(year, month, day)
 
 
+def _due_dates_for_month(frequency, year, month, week_num):
+    normalized = (frequency or "").strip()
+    if normalized in {"週次", "weekly", "Weekly"}:
+        return [_nth_friday(year, month, w) for w in (1, 2, 3, 4)]
+    return [_nth_friday(year, month, week_num)]
+
+
 def _parse_assignees(value):
     if not value:
         return []
@@ -295,18 +323,18 @@ def _format_assignees(value):
     return "; ".join(entries) if entries else None
 
 def _normalize_status(value):
-    normalized = (str(value).strip() if value is not None else "") or "未着手"
+    normalized = (str(value).strip() if value is not None else "") or STATUS_PENDING
     mapping = {
-        "未対応": "未着手",
-        "未着手": "未着手",
-        "pending": "未着手",
-        "進行中": "進行中",
-        "作業中": "進行中",
-        "対応中": "進行中",
-        "in_progress": "進行中",
-        "完了": "完了",
-        "completed": "完了",
-        "done": "完了",
+        "\u672a\u5bfe\u5fdc": STATUS_PENDING,
+        STATUS_PENDING: STATUS_PENDING,
+        "pending": STATUS_PENDING,
+        STATUS_IN_PROGRESS: STATUS_IN_PROGRESS,
+        "\u4f5c\u696d\u4e2d": STATUS_IN_PROGRESS,
+        "\u5bfe\u5fdc\u4e2d": STATUS_IN_PROGRESS,
+        "in_progress": STATUS_IN_PROGRESS,
+        STATUS_DONE: STATUS_DONE,
+        "completed": STATUS_DONE,
+        "done": STATUS_DONE,
     }
     return mapping.get(normalized, normalized)
 
@@ -332,10 +360,7 @@ def _normalize_task_kind(value, assignee_value=None):
 
 
 def _validate_task_kind_assignees(task_kind, assignee_value):
-    assignees = _parse_assignees(assignee_value)
-    if task_kind == "グループ" and len(assignees) < 2:
-        raise ValueError("タスク区分がグループの場合は担当者を2人以上選択してください。")
-
+    return
 
 def _fetch_parent_task_kind(task_no):
     query = "SELECT task_kind FROM dbo.routine_task WHERE task_no = ?"
@@ -361,14 +386,14 @@ def _build_entries(data, registrant, department_cd=None):
 
     week_str = data.get("week")
     week_num = None
+    is_weekly = normalized_freq in {"週次", "weekly", "Weekly"}
     week_optional_freqs = {
         "スポット",
         "spot",
         "Spot",
-        "週次",
-        "weekly",
-        "Weekly",
     }
+    if is_weekly:
+        week_optional_freqs.add(normalized_freq)
     needs_week = normalized_freq not in week_optional_freqs
     if needs_week:
         if week_str is None or week_str == "":
@@ -392,6 +417,7 @@ def _build_entries(data, registrant, department_cd=None):
         return {
             "routine_no": seq,
             "due_date": due_date,
+            "planned_date": due_date,
             "title": data.get("title"),
             "assignee": assignee_value,
             "status": status_value,
@@ -451,6 +477,10 @@ def _build_entries(data, registrant, department_cd=None):
         if normalized_freq in {"四半期", "quarterly"}:
             month_value = ((month_value - 1) % 3) + 1
 
+    if normalized_freq == "隔月":
+        if month_value < 1 or month_value > 12:
+            raise ValueError("month must be between 1 and 12 for 隔月")
+
     half_value = _half_year_from_quarter(quarter_value)
     if half_value is None:
         half_raw = data.get("half_year")
@@ -476,20 +506,23 @@ def _build_entries(data, registrant, department_cd=None):
         "summary": summary_value,
     }
 
-    step_map = {
-        "週次": 1,
-        "月次": 1,
-        "四半期": 3,
-        "半期": 6,
-        "年次": 12,
-        "weekly": 1,
-        "monthly": 1,
-        "quarterly": 3,
-        "half-year": 6,
-        "halfyear": 6,
-        "yearly": 12,
-    }
-    step = step_map.get(normalized_freq)
+    if normalized_freq == "隔月":
+        step = month_value
+    else:
+        step_map = {
+            "週次": 1,
+            "月次": 1,
+            "四半期": 3,
+            "半期": 6,
+            "年次": 12,
+            "weekly": 1,
+            "monthly": 1,
+            "quarterly": 3,
+            "half-year": 6,
+            "halfyear": 6,
+            "yearly": 12,
+        }
+        step = step_map.get(normalized_freq)
     if step is None:
         raise ValueError("unknown frequency")
 
@@ -512,20 +545,30 @@ def _build_entries(data, registrant, department_cd=None):
         generation_start_year, generation_start_month, end_year, end_month, step
     )
     entries = []
-    for seq, (year, month) in enumerate(months, start=1):
-        due_date = _nth_friday(year, month, week_num)
-        entries.append(_create_child(seq, due_date))
+    seq = 1
+    for year, month in months:
+        for due_date in _due_dates_for_month(normalized_freq, year, month, week_num):
+            entries.append(_create_child(seq, due_date))
+            seq += 1
     return parent_entry, entries
 
 
-def _routine_frequency_step(frequency):
+def _routine_frequency_step(frequency, month_value=None):
     normalized_freq = (frequency or "").strip()
+    if normalized_freq == "隔月":
+        try:
+            step = int(month_value)
+        except (TypeError, ValueError):
+            return None, normalized_freq
+        if step < 1 or step > 12:
+            return None, normalized_freq
+        return step, normalized_freq
     step_map = {
         "週次": 1,
         "月次": 1,
         "四半期": 3,
-        "蜊頑悄": 6,
-        "蟷ｴ谺｡": 12,
+        "半期": 6,
+        "年次": 12,
         "weekly": 1,
         "monthly": 1,
         "quarterly": 3,
@@ -542,10 +585,6 @@ def _build_extension_child_entries(current_parent, update_data):
         return []
 
     frequency_value = update_data.get("frequency") or current_parent.get("frequency")
-    step, normalized_freq = _routine_frequency_step(frequency_value)
-    if step is None:
-        # Spot/unknown frequencies do not support periodic extension here.
-        return []
 
     start_month_value = update_data.get("start_month") or current_parent.get("start_month")
     old_end_month_value = current_parent.get("end_month")
@@ -568,8 +607,13 @@ def _build_extension_child_entries(current_parent, update_data):
         month_value = int(month_raw)
     else:
         month_value = start_month
-        if normalized_freq in {"四半期", "quarterly"}:
+        if (frequency_value or "").strip() in {"四半期", "quarterly"}:
             month_value = ((month_value - 1) % 3) + 1
+
+    step, normalized_freq = _routine_frequency_step(frequency_value, month_value)
+    if step is None:
+        # Spot/unknown frequencies do not support periodic extension here.
+        return []
 
     week_raw = update_data.get("week_num")
     if week_raw is None:
@@ -624,15 +668,18 @@ def _build_extension_child_entries(current_parent, update_data):
 
     extension_entries = []
     for year, month in extension_months:
-        extension_entries.append(
-            {
-                "due_date": _nth_friday(year, month, week_num),
-                "title": title_value,
-                "assignee": assignee_value,
-                "status": status_value,
-                "summary": summary_value,
-            }
-        )
+        due_dates = _due_dates_for_month(normalized_freq, year, month, week_num)
+        for due_date in due_dates:
+            extension_entries.append(
+                {
+                    "due_date": due_date,
+                    "planned_date": due_date,
+                    "title": title_value,
+                    "assignee": assignee_value,
+                    "status": status_value,
+                    "summary": summary_value,
+                }
+            )
     return extension_entries
 
 
@@ -643,6 +690,8 @@ def _routine_child_columns():
         "due_date",
         "summary",
     ]
+    if _routine_child_has_planned_date_column():
+        columns.insert(3, "planned_date")
     if _routine_child_has_status_column():
         columns.insert(3, "status")
     if _routine_child_has_title_column():
@@ -757,11 +806,11 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
                 (
                     (YEAR(c.due_date) = ? AND MONTH(c.due_date) = ?)
                     OR
-                    (c.due_date < ? AND COALESCE({status_expr}, '') <> N'完了')
+                    (c.due_date < ? AND COALESCE({status_expr}, '') <> ?)
                 )
                 """
             )
-            params.extend([year_num, month_num, filter_month_start])
+            params.extend([year_num, month_num, filter_month_start, STATUS_DONE])
         else:
             conds.append("YEAR(c.due_date) = ? AND MONTH(c.due_date) = ?")
             params.extend([year_num, month_num])
@@ -774,6 +823,7 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
     child_assignee_sql = "c.assignee" if _routine_child_has_assignee_column() else "p.assignee"
     child_title_sql = "c.title" if _routine_child_has_title_column() else "p.title"
     child_status_sql = "c.status" if _routine_child_has_status_column() else "NULL"
+    child_planned_date_sql = "c.planned_date" if _routine_child_has_planned_date_column() else "c.due_date"
     try:
         with _get_db_connection() as conn:
             cursor = conn.cursor()
@@ -792,6 +842,7 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
                     p.month AS parent_month,
                     p.week_num AS parent_week_num,
                     c.due_date,
+                    {child_planned_date_sql} AS planned_date,
                     {child_assignee_sql} AS assignee,
                     p.task_kind,
                     p.registrant,
@@ -816,6 +867,7 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
             for row in rows:
                 record = dict(zip(columns, row))
                 due_date_value = record.get("due_date")
+                planned_date_value = record.get("planned_date")
                 if due_date_value:
                     record["due_date"] = due_date_value.isoformat()
                     parsed_due = due_date_value
@@ -831,6 +883,8 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
                         record["half_year"] = _half_year_from_quarter(record.get("parent_quarter"))
                     record["month"] = record.get("parent_month")
                     record["week_num"] = record.get("parent_week_num")
+                if planned_date_value:
+                    record["planned_date"] = planned_date_value.isoformat()
                 record["summary"] = record.get("child_summary") or record.get("parent_summary")
                 record["status"] = _normalize_status(record.get("status"))
                 for cleanup_key in (
@@ -1086,7 +1140,7 @@ def _complete_task(task_no):
         UPDATE dbo.routine_task
         SET is_deleted = 1,
             deleted_at = SYSUTCDATETIME(),
-    status = '完了'
+            status = ?
         WHERE task_no = ?
           AND is_deleted = 0
     """
@@ -1100,7 +1154,7 @@ def _complete_task(task_no):
     try:
         with _get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(parent_query, [task_no])
+            cursor.execute(parent_query, [STATUS_DONE, task_no])
             cursor.execute(child_query, [task_no])
             conn.commit()
     except pyodbc.Error as exc:
@@ -1108,7 +1162,16 @@ def _complete_task(task_no):
 
 
 def _update_child(record_no, data):
-    allowed = ["due_date", "summary"]
+    if "due_date" in data:
+        raise ValueError("期日は編集できません。")
+    allowed = ["summary"]
+    has_planned_date = _routine_child_has_planned_date_column()
+    if "planned_date" in data and not has_planned_date:
+        raise ValueError(
+            "予定日の更新にはDB列が必要です。routine_task_child.planned_date を追加してください"
+        )
+    if has_planned_date:
+        allowed.insert(0, "planned_date")
     has_child_status = _routine_child_has_status_column()
     if has_child_status:
         allowed.insert(1, "status")
@@ -1131,6 +1194,16 @@ def _update_child(record_no, data):
     for key in allowed:
         if key in data and data[key] is not None:
             value = data[key]
+            if key == "planned_date":
+                if isinstance(value, str):
+                    value = value.strip()
+                if not value:
+                    value = None
+                else:
+                    try:
+                        value = date.fromisoformat(value)
+                    except ValueError as exc:
+                        raise ValueError("予定日の形式が不正です。YYYY-MM-DD で指定してください。") from exc
             if key == "assignee":
                 value = _format_assignees(value)
             if key == "status":
@@ -1159,7 +1232,7 @@ def _complete_routine(record_no):
         UPDATE dbo.routine_task_child
         SET is_deleted = 1,
             deleted_at = SYSUTCDATETIME(),
-            status = '完了'
+            status = ?
         OUTPUT INSERTED.task_no
         WHERE record_no = ?
           AND is_deleted = 0
@@ -1167,7 +1240,7 @@ def _complete_routine(record_no):
     try:
         with _get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, [record_no])
+            cursor.execute(query, [STATUS_DONE, record_no])
             row = cursor.fetchone()
             if not row:
                 raise RuntimeError("Routine already completed or not found")
@@ -1183,11 +1256,11 @@ def _complete_routine(record_no):
                     UPDATE dbo.routine_task
                     SET is_deleted = 1,
                         deleted_at = SYSUTCDATETIME(),
-                        status = '完了'
+                        status = ?
                     WHERE task_no = ?
                       AND is_deleted = 0
                     """,
-                    [task_no],
+                    [STATUS_DONE, task_no],
                 )
             conn.commit()
     except pyodbc.Error as exc:
