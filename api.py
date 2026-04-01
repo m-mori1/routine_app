@@ -814,6 +814,7 @@ def _notify_slack_on_create(parent_id, parent_entry, child_entries):
     assignees = _parse_assignees(parent_entry.get("assignee"))
     if not assignees:
         return
+    registrant = (parent_entry.get("registrant") or "").strip()
     mapping = _load_slack_assignee_map()
     title = parent_entry.get("title") or ""
     frequency = parent_entry.get("frequency") or ""
@@ -833,6 +834,8 @@ def _notify_slack_on_create(parent_id, parent_entry, child_entries):
         lines.append(f"期間: {start_month} 〜 {end_month}")
     message = "\n".join(lines)
     for assignee in assignees:
+        if registrant and assignee == registrant:
+            continue
         target = mapping.get(assignee) or SLACK_DEFAULT_CHANNEL
         channel = _slack_channel_for_target(target)
         if not channel:
