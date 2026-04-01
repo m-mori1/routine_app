@@ -34,7 +34,6 @@ E2E_TEST_UPN = os.environ.get("ROUTINE_E2E_TEST_UPN", "m-mori")
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "").strip()
-SLACK_ASSIGNEE_MAP = os.environ.get("SLACK_ASSIGNEE_MAP", "").strip()
 SLACK_DEFAULT_CHANNEL = os.environ.get("SLACK_DEFAULT_CHANNEL", "").strip()
 
 STATUS_PENDING = "\u672a\u7740\u624b"
@@ -192,6 +191,28 @@ def _fetch_employee_profile(upn):
             return dict(zip(columns, row))
     except pyodbc.Error as exc:
         raise RuntimeError("Failed to fetch employee profile") from exc
+
+
+def _fetch_employee_by_name(name):
+    if not name:
+        return None
+    employee_table = _qualified_table("Employee")
+    query = f"""
+        SELECT e.UserID, e.EmployeeName, e.AD
+        FROM {employee_table} e
+        WHERE e.EmployeeName = ?
+    """
+    try:
+        with _get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, [name])
+            row = cursor.fetchone()
+            if not row:
+                return None
+            columns = [column[0] for column in cursor.description]
+            return dict(zip(columns, row))
+    except pyodbc.Error:
+        return None
 
 
 def _fetch_departments():
@@ -763,18 +784,6 @@ def _insert_entries(parent_entry, child_entries):
     return parent_id
 
 
-def _load_slack_assignee_map():
-    if not SLACK_ASSIGNEE_MAP:
-        return {}
-    try:
-        data = json.loads(SLACK_ASSIGNEE_MAP)
-        if isinstance(data, dict):
-            return data
-    except json.JSONDecodeError:
-        return {}
-    return {}
-
-
 def _slack_api(method, payload):
     if not SLACK_BOT_TOKEN:
         return {"ok": False, "error": "missing_bot_token"}
@@ -808,6 +817,40 @@ def _slack_channel_for_target(target):
     return target
 
 
+def _assignee_to_email(assignee):
+    if not assignee:
+        return None
+    if "@" in assignee:
+        return assignee
+    profile = _fetch_employee_by_name(assignee)
+    ad_value = (profile or {}).get("AD") or ""
+    ad_value = str(ad_value).strip()
+    if not ad_value:
+        return None
+    if "@" in ad_value:
+        return ad_value
+    return f"{ad_value}@sourcenext.com"
+
+
+def _send_slack_dm_by_email(recipient_email, text):
+    if not recipient_email or "@" not in recipient_email:
+        return False
+    lookup = _slack_api("users.lookupByEmail", {"email": recipient_email})
+    if not lookup or not lookup.get("ok"):
+        return False
+    user_id = ((lookup.get("user") or {}).get("id") or "").strip()
+    if not user_id:
+        return False
+    conv = _slack_api("conversations.open", {"users": user_id})
+    if not conv or not conv.get("ok"):
+        return False
+    channel_id = ((conv.get("channel") or {}).get("id") or "").strip()
+    if not channel_id:
+        return False
+    msg = _slack_api("chat.postMessage", {"channel": channel_id, "text": text})
+    return bool(msg and msg.get("ok"))
+
+
 def _notify_slack_on_create(parent_id, parent_entry, child_entries):
     if not SLACK_BOT_TOKEN:
         return
@@ -815,7 +858,6 @@ def _notify_slack_on_create(parent_id, parent_entry, child_entries):
     if not assignees:
         return
     registrant = (parent_entry.get("registrant") or "").strip()
-    mapping = _load_slack_assignee_map()
     title = parent_entry.get("title") or ""
     frequency = parent_entry.get("frequency") or ""
     start_month = parent_entry.get("start_month") or ""
@@ -836,11 +878,13 @@ def _notify_slack_on_create(parent_id, parent_entry, child_entries):
     for assignee in assignees:
         if registrant and assignee == registrant:
             continue
-        target = mapping.get(assignee) or SLACK_DEFAULT_CHANNEL
-        channel = _slack_channel_for_target(target)
-        if not channel:
+        recipient_email = _assignee_to_email(assignee)
+        if recipient_email and _send_slack_dm_by_email(recipient_email, message):
             continue
-        _slack_api("chat.postMessage", {"channel": channel, "text": message})
+        if SLACK_DEFAULT_CHANNEL:
+            channel = _slack_channel_for_target(SLACK_DEFAULT_CHANNEL)
+            if channel:
+                _slack_api("chat.postMessage", {"channel": channel, "text": message})
 
 
 def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
