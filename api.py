@@ -2,6 +2,9 @@
 import calendar
 import os
 import sys
+import json
+import urllib.request
+import urllib.error
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -30,6 +33,9 @@ E2E_AUTH_BYPASS = os.environ.get("ROUTINE_E2E_BYPASS_AUTH", "0") == "1"
 E2E_TEST_UPN = os.environ.get("ROUTINE_E2E_TEST_UPN", "m-mori")
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
+SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "").strip()
+SLACK_ASSIGNEE_MAP = os.environ.get("SLACK_ASSIGNEE_MAP", "").strip()
+SLACK_DEFAULT_CHANNEL = os.environ.get("SLACK_DEFAULT_CHANNEL", "").strip()
 
 STATUS_PENDING = "\u672a\u7740\u624b"
 STATUS_IN_PROGRESS = "\u9032\u884c\u4e2d"
@@ -754,6 +760,84 @@ def _insert_entries(parent_entry, child_entries):
             conn.commit()
     except pyodbc.Error as exc:
         raise RuntimeError(f"Failed to insert tasks into the database: {exc}") from exc
+    return parent_id
+
+
+def _load_slack_assignee_map():
+    if not SLACK_ASSIGNEE_MAP:
+        return {}
+    try:
+        data = json.loads(SLACK_ASSIGNEE_MAP)
+        if isinstance(data, dict):
+            return data
+    except json.JSONDecodeError:
+        return {}
+    return {}
+
+
+def _slack_api(method, payload):
+    if not SLACK_BOT_TOKEN:
+        return {"ok": False, "error": "missing_bot_token"}
+    url = f"https://slack.com/api/{method}"
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "Authorization": f"Bearer {SLACK_BOT_TOKEN}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = resp.read().decode("utf-8")
+            return json.loads(raw)
+    except (urllib.error.URLError, json.JSONDecodeError):
+        return {"ok": False, "error": "request_failed"}
+
+
+def _slack_channel_for_target(target):
+    if not target:
+        return None
+    if target.startswith("U") or target.startswith("W"):
+        opened = _slack_api("conversations.open", {"users": target})
+        if opened.get("ok"):
+            return opened.get("channel", {}).get("id")
+        return None
+    return target
+
+
+def _notify_slack_on_create(parent_id, parent_entry, child_entries):
+    if not SLACK_BOT_TOKEN:
+        return
+    assignees = _parse_assignees(parent_entry.get("assignee"))
+    if not assignees:
+        return
+    mapping = _load_slack_assignee_map()
+    title = parent_entry.get("title") or ""
+    frequency = parent_entry.get("frequency") or ""
+    start_month = parent_entry.get("start_month") or ""
+    end_month = parent_entry.get("end_month") or ""
+    due_date = parent_entry.get("due_date") or (child_entries[0].get("due_date") if child_entries else None)
+    due_text = due_date.isoformat() if hasattr(due_date, "isoformat") else str(due_date or "")
+    lines = [
+        f"新規ルーチンが登録されました。",
+        f"タイトル: {title}",
+        f"タスクNo: {parent_id}",
+        f"頻度: {frequency}",
+    ]
+    if due_text:
+        lines.append(f"期日: {due_text}")
+    if start_month or end_month:
+        lines.append(f"期間: {start_month} 〜 {end_month}")
+    message = "\n".join(lines)
+    for assignee in assignees:
+        target = mapping.get(assignee) or SLACK_DEFAULT_CHANNEL
+        channel = _slack_channel_for_target(target)
+        if not channel:
+            continue
+        _slack_api("chat.postMessage", {"channel": channel, "text": message})
 
 
 def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
@@ -1423,7 +1507,8 @@ def create_app():
         registrant = _extract_user() or "system"
         user_context = _current_user_context()
         parent_entry, entries = _build_entries(data, registrant, user_context.get("department_cd"))
-        _insert_entries(parent_entry, entries)
+        parent_id = _insert_entries(parent_entry, entries)
+        _notify_slack_on_create(parent_id, parent_entry, entries)
         return jsonify({"message": "逋ｻ骭ｲ縺励∪縺励◆", "task_count": len(entries)}), 201
     @app.route("/api.py/parents", methods=["GET"])
     @app.route("/routine_app/api.py/parents", methods=["GET"])
