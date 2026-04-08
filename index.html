@@ -2087,6 +2087,14 @@
         // ステータス表示は不要にしたため noop
       }
 
+      function handleAuthRedirect(response) {
+        if (response.redirected && /\/login(?:$|\?)/.test(response.url)) {
+          location.href = response.url;
+          return true;
+        }
+        return false;
+      }
+
       function escapeHtml(value) {
         if (value === undefined || value === null) {
           return "";
@@ -3182,13 +3190,21 @@ function renderParents(parents) {
           }
           const taskNo = Number(parentEditForm.task_no.value);
           try {
-            await fetch(parentUpdate(taskNo), {
+            const response = await fetch(parentUpdate(taskNo), {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
+              cache: "no-store",
               body: JSON.stringify({
                 summary: parentEditForm.summary.value,
               }),
             });
+            if (handleAuthRedirect(response)) {
+              return;
+            }
+            if (!response.ok) {
+              const error = await response.json().catch(() => ({}));
+              throw new Error(error.message || "\u66f4\u65b0\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002");
+            }
             parentEditMessage.textContent = "更新しました。";
             await Promise.all([fetchParents(), fetchRoutines()]);
             toggleOverlay(parentEditOverlay, false);
@@ -3201,9 +3217,10 @@ function renderParents(parents) {
         event.preventDefault();
         const recordNo = Number(routineEditForm.record_no.value);
         try {
-          await fetch(routineUpdate(recordNo), {
+          const response = await fetch(routineUpdate(recordNo), {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
+            cache: "no-store",
             body: JSON.stringify({
               planned_date: routineEditPlannedDateInput?.value || null,
               title: routineEditTitleInput?.value,
@@ -3212,6 +3229,13 @@ function renderParents(parents) {
               registrant: currentLoginName,
             }),
           });
+          if (handleAuthRedirect(response)) {
+            return;
+          }
+          if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || "\u66f4\u65b0\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002");
+          }
           routineEditMessage.textContent = "\u66f4\u65b0\u3057\u307e\u3057\u305f\u3002";
           await Promise.all([fetchParents(), fetchRoutines()]);
           toggleOverlay(routineEditOverlay, false);
@@ -3298,6 +3322,7 @@ function renderParents(parents) {
             const response = await fetch(parentUpdate(updateTargetTaskNo), {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
+              cache: "no-store",
               body: JSON.stringify({
                 frequency: payload.frequency,
                 half_year: payload.half_year,
@@ -3315,6 +3340,9 @@ function renderParents(parents) {
                 summary: payload.summary,
               }),
             });
+            if (handleAuthRedirect(response)) {
+              return;
+            }
             if (!response.ok) {
               const error = await response.json().catch(() => ({}));
               throw new Error(error.message || "更新処理に失敗しました");
@@ -3331,10 +3359,14 @@ function renderParents(parents) {
           const response = await fetch(routinesEndpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            cache: "no-store",
             body: JSON.stringify({
               ...payload,
             }),
           });
+          if (handleAuthRedirect(response)) {
+            return;
+          }
           if (!response.ok) {
             const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "登録処理に失敗しました");
