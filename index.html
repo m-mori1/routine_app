@@ -2630,10 +2630,10 @@ function renderParents(parents) {
       }
 
       function isDueTodayOrOverdue(item) {
-        if (!item?.due_date) {
+        if (!item?.planned_date) {
           return false;
         }
-        const due = new Date(item.due_date);
+        const due = new Date(item.planned_date);
         if (Number.isNaN(due.getTime())) {
           return false;
         }
