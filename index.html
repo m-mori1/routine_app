@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
@@ -131,7 +131,7 @@
     .filters {
       display: flex;
       flex-wrap: wrap;
-      gap: 12px;
+      gap:  12px;
       margin-bottom: 12px;
       align-items: flex-end;
     }
@@ -195,6 +195,19 @@
       font-size: 0.75rem;
       color: #475569;
       gap: 4px;
+    }
+    .filters .checkbox-filter {
+      flex-direction: row;
+      align-items: center;
+      gap: 4px;
+            min-height: 30px;
+      font-size: 0.85rem;
+      color: #1f2933;
+      white-space: nowrap;
+    }
+    .filters .checkbox-filter input {
+      width: auto;
+      margin: 0;
     }
     .table-wrapper {
       background: #fff;
@@ -710,7 +723,7 @@
     }
     .form-row {
       display: grid;
-      gap: 12px;
+      gap: 8px;
       margin-bottom: 10px;
     }
     .form-row.full-row {
@@ -886,8 +899,8 @@
     .assignee-manager .assignee-list {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
-      min-height: 30px;
+      gap: 4px;
+            min-height: 30px;
     }
     .assignee-chip {
       display: inline-flex;
@@ -1365,6 +1378,10 @@
         </label>
         <button id="routine-filter-btn" type="button">絞り込み</button>
         <button id="routine-clear-btn" type="button">クリア</button>
+        <label class="checkbox-filter">
+          <input id="routine-include-completed" type="checkbox" />
+          完了も表示
+        </label>
       </div>
       <div class="table-wrapper">
         <table id="routine-table">
@@ -1828,6 +1845,7 @@
         month: document.querySelector("[name='filter-routine-month']"),
         assignee: document.querySelector("[name='filter-routine-assignee']"),
         title: document.getElementById("routine-title-search"),
+        includeCompleted: document.getElementById("routine-include-completed"),
       };
       const parentAssigneeFilterSelect = document.getElementById("parent-assignee-filter");
       function buildRoutineFilterYearOptions() {
@@ -1908,6 +1926,9 @@
         }
         if (routineFilterInputs.title) {
           routineFilterInputs.title.value = "";
+        }
+        if (routineFilterInputs.includeCompleted) {
+          routineFilterInputs.includeCompleted.checked = false;
         }
       }
       const routineFilterBtn = document.getElementById("routine-filter-btn");
@@ -2488,27 +2509,33 @@ async function fetchRoutines() {
         setStatus("Loading routines...");
         try {
           const routinesUrl = new URL(routinesEndpoint);
-          if (routineKindFilter && routineKindFilter !== "all") {
-            routinesUrl.searchParams.set("task_kind", routineKindFilter);
-          }
+          const isParentScoped = Boolean(selectedParentId);
           if (selectedParentId) {
             routinesUrl.searchParams.set("task_no", String(selectedParentId));
+          }
+          if (!isParentScoped && routineKindFilter && routineKindFilter !== "all") {
+            routinesUrl.searchParams.set("task_kind", routineKindFilter);
+          }
+          if (routineFilterInputs.includeCompleted?.checked) {
+            routinesUrl.searchParams.set("include_completed", "1");
           }
           const yearValue = routineFilterInputs.year?.value?.trim() || "";
           const monthValue = routineFilterInputs.month?.value?.trim() || "";
           const assigneeValue = routineFilterInputs.assignee?.value?.trim() || "";
           const titleValue = routineFilterInputs.title?.value?.trim() || "";
-          if (yearValue) {
-            routinesUrl.searchParams.set("year", yearValue);
-          }
-          if (monthValue) {
-            routinesUrl.searchParams.set("month", monthValue);
-          }
-          if (assigneeValue) {
-            routinesUrl.searchParams.set("assignee", assigneeValue);
-          }
-          if (titleValue) {
-            routinesUrl.searchParams.set("title", titleValue);
+          if (!isParentScoped) {
+            if (yearValue) {
+              routinesUrl.searchParams.set("year", yearValue);
+            }
+            if (monthValue) {
+              routinesUrl.searchParams.set("month", monthValue);
+            }
+            if (assigneeValue) {
+              routinesUrl.searchParams.set("assignee", assigneeValue);
+            }
+            if (titleValue) {
+              routinesUrl.searchParams.set("title", titleValue);
+            }
           }
           routinesUrl.searchParams.set("include_past_incomplete", "1");
           routinesUrl.searchParams.set("page", String(routinePage));
@@ -2702,11 +2729,19 @@ function renderParents(parents) {
         return compareSortValues(left, right, "frequency", "asc");
       }
 
+      function isIncompleteStatus(value) {
+        const status = String(value ?? "").trim();
+        return status !== "完了" && status.toLowerCase() !== "completed";
+      }
+
       function sortByState(list, sortState) {
         if (!sortState?.key) {
           return [...list];
         }
         return [...list].sort((a, b) => {
+            const aInc = isIncompleteStatus(a.status);
+            const bInc = isIncompleteStatus(b.status);
+            if (aInc !== bInc) return aInc ? -1 : 1;
           const primary = compareSortValues(a?.[sortState.key], b?.[sortState.key], sortState.key, sortState.dir);
           if (primary !== 0) {
             return primary;
@@ -2736,6 +2771,7 @@ function renderParents(parents) {
       function renderRoutines(routines) {
         routineTableBody.innerHTML = "";
         let list = routines;
+        const isParentScoped = Boolean(selectedParentId);
         const yearFilter = routineFilterInputs.year?.value?.trim() || "";
         const monthFilter = routineFilterInputs.month?.value?.trim() || "";
         const assignee = routineFilterInputs.assignee?.value?.trim() || "";
@@ -2762,10 +2798,7 @@ function renderParents(parents) {
           }
           return null;
         };
-        const isIncompleteStatus = (value) => {
-          const status = String(value ?? "").trim();
-          return status !== "完了" && status.toLowerCase() !== "completed";
-        };
+        
         const isPastComparedToFilter = (item) => {
           if (!hasYearMonthFilter) {
             return false;
@@ -2779,43 +2812,45 @@ function renderParents(parents) {
         if (selectedParentId) {
           list = list.filter((item) => item.task_no === selectedParentId);
         }
-        if (hasYearMonthFilter) {
-          list = list.filter((item) => {
-            const ym = toYearMonth(item);
-            if (!ym) {
-              return false;
+        if (!isParentScoped) {
+          if (hasYearMonthFilter) {
+            list = list.filter((item) => {
+              const ym = toYearMonth(item);
+              if (!ym) {
+                return false;
+              }
+              const matchesSelectedMonth =
+                ym.year === filterYearNum && ym.month === filterMonthNum;
+              const isPastIncomplete = isPastComparedToFilter(item) && isIncompleteStatus(item.status);
+              return matchesSelectedMonth || isPastIncomplete;
+            });
+          } else {
+            if (yearFilter) {
+              list = list.filter((item) => {
+                const value = item.year !== undefined && item.year !== null ? String(item.year) : "";
+                return value === yearFilter;
+              });
             }
-            const matchesSelectedMonth =
-              ym.year === filterYearNum && ym.month === filterMonthNum;
-            const isPastIncomplete = isPastComparedToFilter(item) && isIncompleteStatus(item.status);
-            return matchesSelectedMonth || isPastIncomplete;
-          });
-        } else {
-          if (yearFilter) {
-            list = list.filter((item) => {
-              const value = item.year !== undefined && item.year !== null ? String(item.year) : "";
-              return value === yearFilter;
-            });
+            if (monthFilter) {
+              list = list.filter((item) => {
+                const value =
+                  item.month !== undefined && item.month !== null ? String(item.month) : "";
+                return value === monthFilter;
+              });
+            }
           }
-          if (monthFilter) {
-            list = list.filter((item) => {
-              const value =
-                item.month !== undefined && item.month !== null ? String(item.month) : "";
-              return value === monthFilter;
-            });
+          if (assignee) {
+            list = list.filter(
+              (item) =>
+                (item.assignee && item.assignee.includes(assignee)) ||
+                (item.registrant && item.registrant.includes(assignee))
+              );
           }
-        }
-        if (assignee) {
-          list = list.filter(
-            (item) =>
-              (item.assignee && item.assignee.includes(assignee)) ||
-              (item.registrant && item.registrant.includes(assignee))
+          if (titleKeyword) {
+            list = list.filter((item) =>
+              String(item?.title || "").toLowerCase().includes(titleKeyword)
             );
-        }
-        if (titleKeyword) {
-          list = list.filter((item) =>
-            String(item?.title || "").toLowerCase().includes(titleKeyword)
-          );
+          }
         }
         const toNumberOrMax = (value) => {
           const num = Number(value);
@@ -2845,7 +2880,10 @@ function renderParents(parents) {
           list = sortByState(list, routineSortState);
         } else {
           list = [...list].sort((a, b) => {
-            const dueDiff = toDateOrMax(a.due_date) - toDateOrMax(b.due_date);
+              const aInc = isIncompleteStatus(a.status);
+              const bInc = isIncompleteStatus(b.status);
+              if (aInc !== bInc) return aInc ? -1 : 1;
+              const dueDiff = toDateOrMax(a.due_date) - toDateOrMax(b.due_date);
             if (dueDiff !== 0) {
               return dueDiff;
             }
@@ -2861,13 +2899,16 @@ function renderParents(parents) {
           return;
         }
         list.forEach((routine) => {
+          const isRoutineCompleted =
+            String(routine?.status ?? "").trim() === "完了" ||
+            String(routine?.status ?? "").trim().toLowerCase() === "completed";
           const row = document.createElement("tr");
           row.dataset.childNo = routine.record_no;
-          row.classList.toggle("due-alert", isDueTodayOrOverdue(routine));
+          row.classList.toggle("due-alert", !isRoutineCompleted && isDueTodayOrOverdue(routine));
           row.innerHTML = `
             <td class="complete-cell">
               <div class="complete-cell-inner">
-                <input type="checkbox" class="routine-complete-checkbox" data-record-no="${routine.record_no}" />
+                <input type="checkbox" class="routine-complete-checkbox" data-record-no="${routine.record_no}" ${isRoutineCompleted ? "checked disabled" : ""} />
               </div>
             </td>
             <td>${escapeHtml(routine.task_no)}</td>
@@ -3713,6 +3754,10 @@ function renderParents(parents) {
         routinePage = 1;
         fetchRoutines();
       });
+      routineFilterInputs.includeCompleted?.addEventListener("change", () => {
+        routinePage = 1;
+        fetchRoutines();
+      });
 
       parentPaginationPrev?.addEventListener("click", () => {
         if (parentHasPrev) {
@@ -3857,3 +3902,4 @@ function renderParents(parents) {
   </script>
 </body>
 </html>
+

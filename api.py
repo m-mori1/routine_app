@@ -893,13 +893,33 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
     offset = (page - 1) * page_size
     limit = page_size + 1
     filters = filters or {}
-    conds = [
-        "p.is_deleted = 0",
-        "c.is_deleted = 0",
-        "(p.deleted_at IS NULL OR p.deleted_at > SYSUTCDATETIME())",
-        "(c.deleted_at IS NULL OR c.deleted_at > SYSUTCDATETIME())",
-    ]
-    params = []
+    include_completed = bool(filters.get("include_completed"))
+    has_status_col = _routine_child_has_status_column()
+    status_expr = "c.status" if has_status_col else "p.status"
+    if include_completed:
+        conds = [
+            "(p.is_deleted = 0 OR p.status = ?)",
+            f"(c.is_deleted = 0 OR COALESCE({status_expr}, '') = ? OR p.status = ?)",
+            "(p.deleted_at IS NULL OR p.deleted_at > SYSUTCDATETIME() OR p.status = ?)",
+            f"(c.deleted_at IS NULL OR c.deleted_at > SYSUTCDATETIME() OR COALESCE({status_expr}, '') = ? OR p.status = ?)",
+        ]
+        params = [
+            STATUS_DONE,
+            STATUS_DONE,
+            STATUS_DONE,
+            STATUS_DONE,
+            STATUS_DONE,
+            STATUS_DONE,
+        ]
+    else:
+        conds = [
+            "p.is_deleted = 0",
+            "c.is_deleted = 0",
+            "(p.deleted_at IS NULL OR p.deleted_at > SYSUTCDATETIME())",
+            "(c.deleted_at IS NULL OR c.deleted_at > SYSUTCDATETIME())",
+            f"COALESCE({status_expr}, '') <> ?",
+        ]
+        params = [STATUS_DONE]
     task_kind = filters.get("task_kind")
     if task_kind:
         normalized_kind = _normalize_task_kind(task_kind)
@@ -925,23 +945,31 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
     year = filters.get("year")
     month = filters.get("month")
     include_past_incomplete = bool(filters.get("include_past_incomplete", True))
-    has_status_col = _routine_child_has_status_column()
     if year and month:
         year_num = int(year)
         month_num = int(month)
         filter_month_start = date(year_num, month_num, 1)
         if include_past_incomplete:
-            status_expr = "c.status" if has_status_col else "p.status"
+            if has_status_col:
+                past_incomplete_sql = """
+                    c.due_date < ?
+                    AND COALESCE(c.status, '') <> ?
+                    AND COALESCE(p.status, '') <> ?
+                """
+                past_incomplete_params = [filter_month_start, STATUS_DONE, STATUS_DONE]
+            else:
+                past_incomplete_sql = "c.due_date < ? AND COALESCE(p.status, '') <> ?"
+                past_incomplete_params = [filter_month_start, STATUS_DONE]
             conds.append(
                 f"""
                 (
                     (YEAR(c.due_date) = ? AND MONTH(c.due_date) = ?)
                     OR
-                    (c.due_date < ? AND COALESCE({status_expr}, '') <> ?)
+                    ({past_incomplete_sql})
                 )
                 """
             )
-            params.extend([year_num, month_num, filter_month_start, STATUS_DONE])
+            params.extend([year_num, month_num, *past_incomplete_params])
         else:
             conds.append("YEAR(c.due_date) = ? AND MONTH(c.due_date) = ?")
             params.extend([year_num, month_num])
@@ -953,7 +981,7 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
         params.append(int(month))
     child_assignee_sql = "c.assignee" if _routine_child_has_assignee_column() else "p.assignee"
     child_title_sql = "c.title" if _routine_child_has_title_column() else "p.title"
-    child_status_sql = "c.status" if _routine_child_has_status_column() else "NULL"
+    child_status_sql = "c.status" if has_status_col else "NULL"
     child_planned_date_sql = "c.planned_date" if _routine_child_has_planned_date_column() else "c.due_date"
     try:
         with _get_db_connection() as conn:
@@ -978,6 +1006,7 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
                     p.task_kind,
                     p.registrant,
                     {child_status_sql} AS status,
+                    p.status AS parent_status,
                     {child_title_sql} AS title,
                     p.attachment_link,
                     p.summary AS parent_summary,
@@ -1017,12 +1046,15 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
                 if planned_date_value:
                     record["planned_date"] = planned_date_value.isoformat()
                 record["summary"] = record.get("child_summary") or record.get("parent_summary")
-                record["status"] = _normalize_status(record.get("status"))
+                parent_status = _normalize_status(record.get("parent_status"))
+                child_status = _normalize_status(record.get("status"))
+                record["status"] = STATUS_DONE if parent_status == STATUS_DONE else child_status
                 for cleanup_key in (
                     "parent_year",
                     "parent_quarter",
                     "parent_month",
                     "parent_week_num",
+                    "parent_status",
                     "child_summary",
                     "parent_summary",
                 ):
@@ -1644,6 +1676,7 @@ def create_app():
                 "title": request.args.get("title"),
                 "task_no": request.args.get("task_no"),
                 "include_past_incomplete": request.args.get("include_past_incomplete", "1") != "0",
+                "include_completed": request.args.get("include_completed", "0") == "1",
             }
             return jsonify(_build_routines_payload(page, page_size, filters=filters))
         except ValueError as exc:
