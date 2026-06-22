@@ -1272,6 +1272,16 @@ def _update_parent(task_no, data):
                             """,
                             [old_assignee, task_no],
                         )
+            if "summary" in data and data.get("summary") is not None:
+                cursor.execute(
+                    """
+                    UPDATE dbo.routine_task_child
+                    SET summary = ?, updated_at = SYSUTCDATETIME()
+                    WHERE task_no = ?
+                      AND is_deleted = 0
+                    """,
+                    [data.get("summary"), task_no],
+                )
             cursor.execute(query, params)
             if extension_entries:
                 cursor.execute(

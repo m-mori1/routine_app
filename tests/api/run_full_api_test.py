@@ -233,6 +233,16 @@ def db_get_one_active_child(task_no: int):
         return cur.fetchone()
 
 
+def db_child_summaries(task_no: int):
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT summary FROM dbo.routine_task_child WHERE task_no = ? AND is_deleted = 0",
+            [task_no],
+        )
+        return [row[0] for row in cur.fetchall()]
+
+
 def db_verify_parent_deleted(task_no: int) -> bool:
     with get_conn() as conn:
         cur = conn.cursor()
@@ -302,8 +312,12 @@ def main():
             raise RuntimeError(f'{c.case_id}: child_count expected={c.expected_records}, got={child_count}')
 
         updated_title = title + '_UPD'
-        r = client.patch(f'api.py/parent/{task_no}', json={'title': updated_title, 'summary': f'parent updated {c.case_id}'}, timeout=30)
+        parent_summary = f'parent updated {c.case_id}'
+        r = client.patch(f'api.py/parent/{task_no}', json={'title': updated_title, 'summary': parent_summary}, timeout=30)
         assert_status(r, 204, f'{c.case_id} parent update')
+        child_summaries = db_child_summaries(task_no)
+        if child_summaries != [parent_summary] * c.expected_records:
+            raise RuntimeError(f'{c.case_id}: child summaries were not synced from parent')
 
         child = db_get_one_active_child(task_no)
         if not child:
