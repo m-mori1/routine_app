@@ -1,4 +1,4 @@
-﻿from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import calendar
 import os
 import sys
@@ -43,7 +43,24 @@ _ROUTINE_CHILD_HAS_ASSIGNEE_COLUMN = None
 _ROUTINE_CHILD_HAS_TITLE_COLUMN = None
 _ROUTINE_CHILD_HAS_STATUS_COLUMN = None
 _ROUTINE_CHILD_HAS_PLANNED_DATE_COLUMN = None
+_ROUTINE_CHILD_HAS_TASK_KIND_COLUMN = None
 JST = timezone(timedelta(hours=9))
+
+
+def _routine_child_has_task_kind_column():
+    global _ROUTINE_CHILD_HAS_TASK_KIND_COLUMN
+    if _ROUTINE_CHILD_HAS_TASK_KIND_COLUMN is not None:
+        return _ROUTINE_CHILD_HAS_TASK_KIND_COLUMN
+    query = "SELECT COL_LENGTH('dbo.routine_task_child', 'task_kind')"
+    try:
+        with _get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query)
+            row = cursor.fetchone()
+            _ROUTINE_CHILD_HAS_TASK_KIND_COLUMN = bool(row and row[0] is not None)
+    except pyodbc.Error:
+        _ROUTINE_CHILD_HAS_TASK_KIND_COLUMN = False
+    return _ROUTINE_CHILD_HAS_TASK_KIND_COLUMN
 
 
 def _now_jst_iso():
@@ -439,6 +456,8 @@ def _build_entries(data, registrant, department_cd=None):
     summary_value = data.get("summary")
     status_value = _normalize_status(data.get("status"))
     assignee_value = _format_assignees(data.get("assignee"))
+    task_kind_value = _normalize_task_kind(data.get("task_kind"), assignee_value)
+    _validate_task_kind_assignees(task_kind_value, assignee_value)
 
     def _create_child(seq, due_date):
         return {
@@ -447,12 +466,10 @@ def _build_entries(data, registrant, department_cd=None):
             "planned_date": due_date,
             "title": data.get("title"),
             "assignee": assignee_value,
+            "task_kind": task_kind_value,
             "status": status_value,
             "summary": summary_value,
         }
-
-    task_kind_value = _normalize_task_kind(data.get("task_kind"), assignee_value)
-    _validate_task_kind_assignees(task_kind_value, assignee_value)
 
     if is_spot:
         due_str = data.get("due_date")
@@ -692,6 +709,11 @@ def _build_extension_child_entries(current_parent, update_data):
         if "title" in update_data and update_data.get("title") is not None
         else current_parent.get("title")
     )
+    task_kind_value = (
+        _normalize_task_kind(update_data.get("task_kind"), assignee_value)
+        if "task_kind" in update_data and update_data.get("task_kind") is not None
+        else _normalize_task_kind(current_parent.get("task_kind"), assignee_value)
+    )
 
     extension_entries = []
     for year, month in extension_months:
@@ -703,6 +725,7 @@ def _build_extension_child_entries(current_parent, update_data):
                     "planned_date": due_date,
                     "title": title_value,
                     "assignee": assignee_value,
+                    "task_kind": task_kind_value,
                     "status": status_value,
                     "summary": summary_value,
                 }
@@ -717,6 +740,8 @@ def _routine_child_columns():
         "due_date",
         "summary",
     ]
+    if _routine_child_has_task_kind_column():
+        columns.insert(3, "task_kind")
     if _routine_child_has_planned_date_column():
         columns.insert(3, "planned_date")
     if _routine_child_has_status_column():
@@ -923,7 +948,10 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
     task_kind = filters.get("task_kind")
     if task_kind:
         normalized_kind = _normalize_task_kind(task_kind)
-        conds.append("p.task_kind = ?")
+        if _routine_child_has_task_kind_column():
+            conds.append("COALESCE(c.task_kind, p.task_kind) = ?")
+        else:
+            conds.append("p.task_kind = ?")
         params.append(normalized_kind)
     task_no = filters.get("task_no")
     if task_no is not None and str(task_no).strip():
@@ -983,6 +1011,7 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
     child_title_sql = "c.title" if _routine_child_has_title_column() else "p.title"
     child_status_sql = "c.status" if has_status_col else "NULL"
     child_planned_date_sql = "c.planned_date" if _routine_child_has_planned_date_column() else "c.due_date"
+    child_task_kind_sql = "COALESCE(c.task_kind, p.task_kind)" if _routine_child_has_task_kind_column() else "p.task_kind"
     try:
         with _get_db_connection() as conn:
             cursor = conn.cursor()
@@ -1003,7 +1032,7 @@ def _fetch_tasks(page=1, page_size=DEFAULT_PAGE_SIZE, filters=None):
                     c.due_date,
                     {child_planned_date_sql} AS planned_date,
                     {child_assignee_sql} AS assignee,
-                    p.task_kind,
+                    {child_task_kind_sql} AS task_kind,
                     p.registrant,
                     {child_status_sql} AS status,
                     p.status AS parent_status,
@@ -1216,7 +1245,8 @@ def _update_parent(task_no, data):
             assignee,
             status,
             summary,
-            title
+            title,
+            task_kind
         FROM dbo.routine_task
         WHERE task_no = ?
           AND is_deleted = 0
@@ -1238,6 +1268,7 @@ def _update_parent(task_no, data):
                 "status": current_row[6],
                 "summary": current_row[7],
                 "title": current_row[8],
+                "task_kind": current_row[9],
             }
             requested_end_month = data.get("end_month")
             if requested_end_month and current_parent.get("end_month"):
@@ -1362,6 +1393,13 @@ def _update_child(record_no, data):
         )
     if has_child_assignee:
         allowed.insert(1, "assignee")
+    has_child_task_kind = _routine_child_has_task_kind_column()
+    if "task_kind" in data and not has_child_task_kind:
+        raise ValueError(
+            "タスク区分の個別更新にはDB列が必要です。routine_task_child.task_kind を追加してください"
+        )
+    if has_child_task_kind:
+        allowed.insert(1, "task_kind")
     updates = []
     params = []
     for key in allowed:
@@ -1381,6 +1419,8 @@ def _update_child(record_no, data):
                 value = _format_assignees(value)
             if key == "status":
                 value = _normalize_status(value)
+            if key == "task_kind":
+                value = _normalize_task_kind(value) if value else None
             updates.append(f"{key} = ?")
             params.append(value)
     if not updates:
