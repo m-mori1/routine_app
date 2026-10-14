@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
@@ -867,8 +867,41 @@
       align-items: start;
     }
     #routine-edit-form .title-date-row {
-      grid-template-columns: minmax(260px, 1fr) 160px 160px;
+      grid-template-columns: minmax(200px, 1fr) 140px 140px 140px;
       align-items: end;
+    }
+    /* 新設お知らせ欄のスタイル（プレミアムモダン） */
+    .news-banner {
+      margin: 12px auto;
+      max-width: 1200px;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      padding: 12px 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    }
+    .news-banner details summary {
+      font-weight: 600;
+      color: #1e293b;
+      cursor: pointer;
+      user-select: none;
+      outline: none;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .news-banner details[open] summary {
+      margin-bottom: 8px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 6px;
+    }
+    .news-banner .news-content p {
+      font-size: 0.9rem;
+      color: #475569;
+      margin: 6px 0;
+      line-height: 1.5;
     }
     #routine-edit-form input[name="due_date"][readonly] {
       background: #f3f4f6;
@@ -1287,6 +1320,20 @@
       overflow: hidden !important;
       text-overflow: ellipsis !important;
     }
+    .attachment-section { margin: 12px 0; min-width: 0; }
+    .attachment-section input { max-width: 100%; }
+    .attachment-list { list-style: none; padding: 0; margin: 8px 0; }
+    .attachment-list li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #e2e8f0; }
+    .attachment-list .attachment-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .attachment-list .attachment-size { flex-shrink: 0; color: #64748b; font-size: 12px; }
+    .attachment-list button { flex-shrink: 0; padding: 4px 8px; }
+    #action-message { padding: 8px 0; color: #166534; overflow-wrap: anywhere; }
+    #action-message:empty { display: none; }
+    #action-message.warning { color: #b45309; }
+    @media (max-width: 720px) {
+      #routine-form .form-row.three-column { grid-template-columns: minmax(0, 1fr); }
+      #routine-form .form-row.three-column label { min-width: 0; }
+    }
   </style>
 </head>
 <!-- Revert quickly: remove `theme-modern` from body class -->
@@ -1295,7 +1342,15 @@
     <header>
       <h1 id="page-title">タスク管理ツール</h1>
     </header>
+
     <div class="screen-indicator" id="screen-indicator" aria-live="polite">親タスク一覧</div>
+    <p id="action-message" role="status"></p>
+    <div class="news-banner">
+      <details>
+        <summary>お知らせ</summary>
+        <div class="news-content"><p>2026/10/15 タスク作成者本人をGoogle Chatの通知対象から除外しました。他の担当者がいる場合は、その担当者だけをメンションします。担当者が作成者本人だけの場合は、スペースへ通知しません。</p><p>2026/10/14 Google ChatのスペースへのWebhook通知と、担当者全員へのメンションに対応しました（専用スペースの接続設定後に有効）。個別のBOT導入やMarketplace掲載は不要です。スペース方式ではDMを送信しません。承認通知の設定は変更しません。</p><p>2026/10/13 親タスクへの添付ファイル追加に対応しました。Google Chatの担当者宛DM通知機能を追加しました（接続設定後に有効）。通知エラーの原因表示とChatボットからのDM送信に対応しました。</p></div>
+      </details>
+    </div>
     <div class="tab-line">
       <div class="tab-controls">
         <button id="open-create-btn" type="button">タスク作成</button>
@@ -1561,6 +1616,12 @@
             <textarea name="summary" maxlength="500"></textarea>
           </label>
         </div>
+        <div class="attachment-section">
+          <label for="parent-attachment-input">添付ファイル</label>
+          <input id="parent-attachment-input" type="file" multiple aria-label="添付ファイル（1件10MB、合計25MB、10件まで）" />
+          <ul id="parent-attachment-list" class="attachment-list" aria-live="polite"></ul>
+          <p id="parent-attachment-message" class="form-message" role="status"></p>
+        </div>
         <div class="form-actions">
           <button class="primary" type="submit">登録</button>
           <button class="secondary" type="button" id="cancel-create">閉じる</button>
@@ -1608,6 +1669,13 @@
 	                <span>&#x4E88;&#x5B9A;&#x65E5;</span>
 	                <input type="date" name="planned_date" />
 	              </label>
+              <label>
+                <span>タスク区分</span>
+                <select name="task_kind">
+                  <option value="個人">個人</option>
+                  <option value="グループ">グループ</option>
+                </select>
+              </label>
 	            </div>
             <div class="form-row first-row">
               <label>
@@ -1950,6 +2018,14 @@
       const routineForm = document.getElementById("routine-form");
       const cancelBtn = document.getElementById("cancel-create");
       const formMessage = document.getElementById("form-message");
+      const attachmentInput = document.getElementById("parent-attachment-input");
+      const attachmentList = document.getElementById("parent-attachment-list");
+      const attachmentMessage = document.getElementById("parent-attachment-message");
+      const actionMessage = document.getElementById("action-message");
+      let pendingAttachments = [];
+      let savedAttachments = [];
+      let attachmentLoadId = 0;
+      let taskSaving = false;
       const assigneeHiddenInput = routineForm.querySelector('[name="assignee"]');
       const registrantInput = routineForm.querySelector('[name="registrant"]');
       const frequencySelect = routineForm.querySelector('[name="frequency"]');
@@ -1993,6 +2069,7 @@
       const routineEditTitleInput = routineEditForm.querySelector('[name="title"]');
       const routineEditDueDateInput = routineEditForm.querySelector('[name="due_date"]');
       const routineEditPlannedDateInput = routineEditForm.querySelector('[name="planned_date"]');
+      const routineEditTaskKindSelect = routineEditForm.querySelector('[name="task_kind"]');
       const routineEditYearInput = routineEditForm.querySelector('[name="edit_year"]');
       const routineEditHalfSelect = routineEditForm.querySelector('[name="edit_half_year"]');
       const routineEditQuarterSelect = routineEditForm.querySelector('[name="edit_quarter"]');
@@ -3008,6 +3085,96 @@ function renderParents(parents) {
         toggleOverlay(creationOverlay, true);
       }
 
+      function attachmentUrl(taskNo, attachmentId = null) {
+        return `${parentUpdate(taskNo)}/attachments${attachmentId === null ? "" : `/${attachmentId}`}`;
+      }
+
+      function renderAttachments() {
+        attachmentList.replaceChildren();
+        const append = (name, size, onRemove, href = null) => {
+          const row = document.createElement("li");
+          const filename = document.createElement(href ? "a" : "span");
+          filename.className = "attachment-name";
+          filename.textContent = name;
+          if (href) { filename.href = href; filename.setAttribute("download", name); }
+          const fileSize = document.createElement("span");
+          fileSize.className = "attachment-size";
+          fileSize.textContent = size >= 1048576 ? `${(size / 1048576).toFixed(1)} MB` : `${Math.ceil(size / 1024)} KB`;
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.textContent = "削除";
+          remove.title = `${name}を削除`;
+          remove.setAttribute("aria-label", `${name}を削除`);
+          remove.disabled = taskSaving;
+          remove.addEventListener("click", onRemove);
+          row.append(filename, fileSize, remove);
+          attachmentList.appendChild(row);
+        };
+        savedAttachments.forEach((file) => append(file.filename, file.file_size,
+          () => deleteAttachment(file), attachmentUrl(editingParentId, file.attachment_id)));
+        pendingAttachments.forEach((file, index) => append(file.name, file.size, () => {
+          pendingAttachments.splice(index, 1);
+          renderAttachments();
+        }));
+      }
+
+      async function loadAttachments(taskNo) {
+        const loadId = ++attachmentLoadId;
+        attachmentMessage.textContent = "添付ファイルを取得中...";
+        try {
+          const response = await fetch(attachmentUrl(taskNo), { cache: "no-store" });
+          if (loadId !== attachmentLoadId || editingParentId !== taskNo) return;
+          if (handleAuthRedirect(response)) return;
+          if (!response.ok) throw new Error("添付ファイルの取得に失敗しました。");
+          const data = await response.json();
+          if (loadId !== attachmentLoadId || editingParentId !== taskNo) return;
+          savedAttachments = data.attachments || [];
+          attachmentMessage.textContent = "";
+          renderAttachments();
+        } catch (error) {
+          if (loadId === attachmentLoadId) attachmentMessage.textContent = error.message;
+        }
+      }
+
+      async function deleteAttachment(file) {
+        if (taskSaving || !window.confirm(`${file.filename}を削除しますか？`)) return;
+        const taskNo = editingParentId;
+        try {
+          const response = await fetch(attachmentUrl(taskNo, file.attachment_id), { method: "DELETE" });
+          if (editingParentId !== taskNo) return;
+          if (handleAuthRedirect(response)) return;
+          if (!response.ok) throw new Error("添付ファイルの削除に失敗しました。");
+          savedAttachments = savedAttachments.filter((item) => item.attachment_id !== file.attachment_id);
+          attachmentMessage.textContent = "削除しました。";
+          renderAttachments();
+        } catch (error) {
+          if (editingParentId === taskNo) attachmentMessage.textContent = error.message;
+        }
+      }
+
+      attachmentInput.addEventListener("change", () => {
+        const next = [...pendingAttachments, ...attachmentInput.files];
+        attachmentInput.value = "";
+        if (next.length > 10 || next.some((file) => !file.size || file.size > 10 * 1024 * 1024)
+            || next.reduce((total, file) => total + file.size, 0) > 25 * 1024 * 1024) {
+          attachmentMessage.textContent = "1件10MB以下、合計25MB以下、10件までの空でないファイルを選択してください。";
+          return;
+        }
+        pendingAttachments = next;
+        attachmentMessage.textContent = "";
+        renderAttachments();
+      });
+
+      function taskRequestOptions(method, data) {
+        if (!pendingAttachments.length) {
+          return { method, headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify(data) };
+        }
+        const body = new FormData();
+        body.append("data", JSON.stringify(data));
+        pendingAttachments.forEach((file) => body.append("attachments", file, file.name));
+        return { method, cache: "no-store", body };
+      }
+
       function renderRoutineModalList(list) {
         routineModalBody.innerHTML = "";
         if (!list.length) {
@@ -3202,6 +3369,9 @@ function renderParents(parents) {
         if (routineEditPlannedDateInput) {
           routineEditPlannedDateInput.value = routine.planned_date || routine.due_date || "";
         }
+        if (routineEditTaskKindSelect) {
+          routineEditTaskKindSelect.value = routine.task_kind || "";
+        }
         if (routineEditTitleInput) {
           routineEditTitleInput.value = routine.title || "";
         }
@@ -3275,6 +3445,7 @@ function renderParents(parents) {
             cache: "no-store",
             body: JSON.stringify({
               planned_date: routineEditPlannedDateInput?.value || null,
+              task_kind: routineEditTaskKindSelect?.value || null,
               title: routineEditTitleInput?.value,
               assignee: routineEditAssigneeManager?.getAssignees(),
               summary: routineEditForm.summary.value,
@@ -3300,6 +3471,7 @@ function renderParents(parents) {
 
       routineForm.addEventListener("submit", async (event) => {
         event.preventDefault();
+        if (taskSaving) return;
         const taskNoInput = routineForm.querySelector('[name="task_no"]');
         const taskNoFromForm = Number(taskNoInput?.value || "");
         const updateTargetTaskNo =
@@ -3312,14 +3484,8 @@ function renderParents(parents) {
           return;
         }
         const selectedTaskKind = (taskKindSelect?.value || "").trim();
-        let applyAssigneeToRoutines = true;
         if (updateTargetTaskNo) {
-          const currentAssigneeText = selectedAssignees.join("; ");
-          if (editingParentOriginalAssignee !== currentAssigneeText) {
-            applyAssigneeToRoutines = window.confirm(
-              "\u62c5\u5f53\u8005\u306e\u5909\u66f4\u3092\u3059\u3079\u3066\u306e\u30eb\u30fc\u30c1\u30f3\u306b\u53cd\u6620\u3055\u305b\u307e\u3059\u304b\uff1f\nOK: \u53cd\u6620\u3055\u305b\u308b\n\u30ad\u30e3\u30f3\u30bb\u30eb: \u53cd\u6620\u3055\u305b\u306a\u3044"
-            );
-          } else if (!window.confirm("\u5909\u66f4\u3092\u4fdd\u5b58\u3057\u307e\u3059\u304b\uff1f")) {
+          if (!window.confirm("\u5909\u66f4\u5185\u5bb9\u3092\u3059\u3079\u3066\u306e\u30eb\u30fc\u30c1\u30f3\u306b\u53cd\u6620\u3057\u307e\u3059\u3002\u4fdd\u5b58\u3057\u307e\u3059\u304b\uff1f")) {
             routineForm.reset();
             setDefaultFormValues();
             toggleOverlay(creationOverlay, false);
@@ -3357,6 +3523,11 @@ function renderParents(parents) {
           registrant: registrantInput?.value || currentLoginName,
           summary: formData.get("summary"),
         };
+        taskSaving = true;
+        cancelBtn.disabled = true;
+        routineForm.querySelector('[type="submit"]').disabled = true;
+        attachmentInput.disabled = true;
+        renderAttachments();
         try {
           if (updateTargetTaskNo) {
             const oldEndMonth = parseYmValue(editingParentOriginalEndMonth || "");
@@ -3371,11 +3542,7 @@ function renderParents(parents) {
                 return;
               }
             }
-            const response = await fetch(parentUpdate(updateTargetTaskNo), {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              cache: "no-store",
-              body: JSON.stringify({
+            const response = await fetch(parentUpdate(updateTargetTaskNo), taskRequestOptions("PATCH", {
                 frequency: payload.frequency,
                 half_year: payload.half_year,
                 due_date: payload.due_date,
@@ -3386,12 +3553,10 @@ function renderParents(parents) {
                 month: payload.month ? Number(payload.month) : null,
                 week_num: payload.week_num,
                 assignee: payload.assignee,
-                apply_assignee_to_routines: applyAssigneeToRoutines,
                 task_kind: payload.task_kind,
                 title: payload.title,
                 summary: payload.summary,
-              }),
-            });
+              }));
             if (handleAuthRedirect(response)) {
               return;
             }
@@ -3400,6 +3565,8 @@ function renderParents(parents) {
               throw new Error(error.message || "更新処理に失敗しました");
             }
             formMessage.textContent = "更新しました。";
+            actionMessage.textContent = "更新しました。";
+            actionMessage.classList.remove("warning");
             setCreationMode();
             routineForm.reset();
             setDefaultFormValues();
@@ -3408,14 +3575,7 @@ function renderParents(parents) {
             await Promise.all([fetchParents(), fetchRoutines()]);
             return;
           }
-          const response = await fetch(routinesEndpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            cache: "no-store",
-            body: JSON.stringify({
-              ...payload,
-            }),
-          });
+          const response = await fetch(routinesEndpoint, taskRequestOptions("POST", payload));
           if (handleAuthRedirect(response)) {
             return;
           }
@@ -3424,6 +3584,39 @@ function renderParents(parents) {
             throw new Error(error.message || "登録処理に失敗しました");
           }
           formMessage.textContent = "登録しました。";
+          const result = await response.json();
+          const chatStatus = result.google_chat?.status;
+          const isSpaceNotification = result.google_chat?.delivery === "space";
+          const chatFailureReasons = new Set((result.google_chat?.failures || []).map((failure) => failure.reason));
+          actionMessage.classList.toggle("warning", !["sent", "skipped"].includes(chatStatus));
+          actionMessage.textContent = chatStatus === "skipped"
+            ? "登録しました。通知対象の担当者がいないため、Google Chat通知は送信していません。"
+            : chatStatus === "sent"
+            ? isSpaceNotification
+              ? "登録しました。Google Chatのスペースに担当者へのメンション付き通知を送信しました。"
+              : "登録しました。担当者へGoogle ChatのDMを送信しました。"
+            : chatStatus === "disabled"
+              ? "登録しました。Google Chat通知は接続設定が未完了です。"
+              : isSpaceNotification
+                ? result.google_chat?.posted
+                  ? "登録しました。スペースに通知しましたが、一部担当者をメンションできませんでした。担当者と接続設定を確認してください。"
+                  : chatFailureReasons.has("webhook_invalid") || chatFailureReasons.has("webhook_not_found")
+                    ? "登録しました。Google Chatのスペース通知の送信先設定が不正、または無効です。"
+                    : "登録しました。Google Chatのスペース通知に失敗しました。担当者と接続設定を確認してください。"
+              : chatFailureReasons.has("sender_is_recipient")
+                ? "登録しました。Google Chatの送信アカウント本人にはDMを送れません。送信元の設定を確認してください。"
+                : chatFailureReasons.has("bot_not_configured")
+                  ? "登録しました。Google Chat通知アプリが未設定です。管理者によるChatアプリの設定が必要です。"
+                : chatFailureReasons.has("bot_not_installed")
+                  ? "登録しました。Google Chatボットが未導入の担当者にはDMを送れません。ボットの導入設定を確認してください。"
+                  : chatFailureReasons.has("service_disabled")
+                    ? "登録しました。Google Chat通知に必要なAPIが無効です。Google CloudのAPI設定を確認してください。"
+                    : chatFailureReasons.has("permission_denied")
+                      ? "登録しました。Google Chat通知の権限が不足しています。ボットの権限設定を確認してください。"
+                      : chatFailureReasons.has("authorization_expired")
+                        ? "登録しました。Google Chat通知の認証が失効しています。管理者による再認証が必要です。"
+              : "登録しました。Google Chat通知に失敗しました。";
+          setCreationMode();
           routineForm.reset();
           setDefaultFormValues();
           toggleOverlay(creationOverlay, false);
@@ -3431,6 +3624,12 @@ function renderParents(parents) {
           await Promise.all([fetchParents(), fetchRoutines()]);
         } catch (error) {
           formMessage.textContent = `エラー: ${error.message}`;
+        } finally {
+          taskSaving = false;
+          cancelBtn.disabled = false;
+          routineForm.querySelector('[type="submit"]').disabled = false;
+          attachmentInput.disabled = false;
+          renderAttachments();
         }
       });
 
@@ -3581,6 +3780,13 @@ function renderParents(parents) {
       function setCreationMode(parent = null) {
         const nextTaskNo = parent ? Number(parent.task_no) : null;
         editingParentId = Number.isFinite(nextTaskNo) && nextTaskNo > 0 ? nextTaskNo : null;
+        attachmentLoadId += 1;
+        pendingAttachments = [];
+        savedAttachments = [];
+        attachmentInput.value = "";
+        attachmentMessage.textContent = "";
+        renderAttachments();
+        if (editingParentId) loadAttachments(editingParentId);
         editingParentOriginalAssignee = "";
         editingParentOriginalEndMonth = parent?.end_month || "";
         const taskNoInput = routineForm?.querySelector('[name="task_no"]');
@@ -3834,6 +4040,7 @@ function renderParents(parents) {
       });
 
       function hideOverlay(overlay) {
+        if (overlay === creationOverlay && taskSaving) return;
         overlay.classList.add("hidden");
         if (overlay === routineEditOverlay) {
           routineEditorParentId = null;
@@ -3865,6 +4072,7 @@ function renderParents(parents) {
         });
       });
       openCreateBtn.addEventListener("click", () => {
+        if (taskSaving) return;
         setCreationMode();
         setDefaultFormValues();
         loadAssignee();
@@ -3872,6 +4080,7 @@ function renderParents(parents) {
         toggleOverlay(creationOverlay, true);
       });
       cancelBtn.addEventListener("click", () => {
+        if (taskSaving) return;
         routineForm.reset();
         setCreationMode();
         setDefaultFormValues();

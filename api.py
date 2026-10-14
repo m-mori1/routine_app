@@ -3,17 +3,22 @@ import calendar
 import os
 import sys
 import json
+from io import BytesIO
 import urllib.request
 import urllib.error
+from urllib.parse import urlsplit
 from pathlib import Path
 
 from dotenv import load_dotenv
 import logging
+from logging.handlers import RotatingFileHandler
 import msal
 import pyodbc
-from flask import Flask, jsonify, request, send_from_directory, session, redirect, url_for
+from flask import Flask, jsonify, request, send_file, send_from_directory, session, redirect, url_for
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from db_config import get_connection_string
+from google_chat import notify_task_created
 
 BASE_DIR = Path(__file__).resolve().parent
 base_dir = BASE_DIR
@@ -753,7 +758,86 @@ def _routine_child_columns():
     return columns
 
 
-def _insert_entries(parent_entry, child_entries):
+def _sync_parent_fields_to_children(cursor, task_no, data, assignee_value, task_kind_value):
+    updates = []
+    params = []
+
+    if "summary" in data and data.get("summary") is not None:
+        updates.append("summary = ?")
+        params.append(data.get("summary"))
+    if "title" in data and data.get("title") is not None and _routine_child_has_title_column():
+        updates.append("title = ?")
+        params.append(data.get("title"))
+    if "assignee" in data and data.get("assignee") is not None and _routine_child_has_assignee_column():
+        updates.append("assignee = ?")
+        params.append(assignee_value)
+    if "task_kind" in data and data.get("task_kind") is not None and _routine_child_has_task_kind_column():
+        updates.append("task_kind = ?")
+        params.append(task_kind_value)
+    if "status" in data and data.get("status") is not None and _routine_child_has_status_column():
+        updates.append("status = ?")
+        params.append(_normalize_status(data.get("status")))
+
+    if not updates:
+        return
+
+    params.append(task_no)
+    cursor.execute(
+        f"""
+        UPDATE dbo.routine_task_child
+        SET {', '.join(updates)}, updated_at = SYSUTCDATETIME()
+        WHERE task_no = ?
+          AND is_deleted = 0
+        """,
+        params,
+    )
+
+
+def _read_attachments() -> list[dict]:
+    files = [file for file in request.files.getlist("attachments") if file.filename]
+    if len(files) > 10:
+        raise ValueError("\u6dfb\u4ed8\u306f1\u56de\u306b10\u30d5\u30a1\u30a4\u30eb\u307e\u3067\u3067\u3059\u3002")
+    attachments = []
+    total_size = 0
+    for file in files:
+        filename = file.filename.replace("\\", "/").rsplit("/", 1)[-1].strip()
+        if not filename or len(filename) > 255 or any(ord(char) < 32 for char in filename):
+            raise ValueError("\u6dfb\u4ed8\u30d5\u30a1\u30a4\u30eb\u540d\u304c\u4e0d\u6b63\u3067\u3059\u3002")
+        content = file.stream.read(10 * 1024 * 1024 + 1)
+        if not content or len(content) > 10 * 1024 * 1024:
+            raise ValueError("\u6dfb\u4ed8\u306f1\u30d5\u30a1\u30a4\u30eb10MB\u4ee5\u4e0b\u3067\u3001\u7a7a\u3067\u306a\u3044\u30d5\u30a1\u30a4\u30eb\u3092\u9078\u629e\u3057\u3066\u304f\u3060\u3055\u3044\u3002")
+        total_size += len(content)
+        if total_size > 25 * 1024 * 1024:
+            raise ValueError("\u6dfb\u4ed8\u306e\u5408\u8a08\u306f25MB\u4ee5\u4e0b\u306b\u3057\u3066\u304f\u3060\u3055\u3044\u3002")
+        attachments.append({"filename": filename, "content": content})
+    return attachments
+
+
+def _task_request_data() -> dict:
+    if request.mimetype == "multipart/form-data":
+        try:
+            data = json.loads(request.form.get("data", "{}"))
+        except json.JSONDecodeError as exc:
+            raise ValueError("Invalid task data") from exc
+    else:
+        data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        raise ValueError("Task data must be an object")
+    return data
+
+
+def _insert_attachments(cursor, task_no: int, attachments: list[dict]) -> None:
+    for attachment in attachments:
+        cursor.execute(
+            """INSERT INTO dbo.routine_task_attachment
+               (task_no, filename, file_size, content, uploaded_by)
+               VALUES (?, ?, ?, ?, ?)""",
+            [task_no, attachment["filename"], len(attachment["content"]),
+             pyodbc.Binary(attachment["content"]), _extract_user()],
+        )
+
+
+def _insert_entries(parent_entry, child_entries, attachments=None):
     parent_columns = [
         "frequency",
         "half_year",
@@ -803,6 +887,7 @@ def _insert_entries(parent_entry, child_entries):
                         for entry in child_entries
                     ],
                 )
+            _insert_attachments(cursor, parent_id, attachments or [])
             conn.commit()
     except pyodbc.Error as exc:
         raise RuntimeError(f"Failed to insert tasks into the database: {exc}") from exc
@@ -1176,7 +1261,7 @@ def _fetch_parent_tasks(filters, page=1, page_size=DEFAULT_PAGE_SIZE):
         raise RuntimeError("Failed to fetch parent tasks") from exc
 
 
-def _update_parent(task_no, data):
+def _update_parent(task_no, data, attachments=None):
     allowed = [
         "frequency",
         "half_year",
@@ -1199,7 +1284,6 @@ def _update_parent(task_no, data):
     assignee_for_validation = None
     task_kind_for_validation = None
     derived_half_year = None
-    apply_assignee_to_routines = bool(data.get("apply_assignee_to_routines", True))
     for key in allowed:
         if key in data and data[key] is not None:
             if key == "half_year" and "quarter" in data and data.get("quarter") is not None:
@@ -1227,12 +1311,12 @@ def _update_parent(task_no, data):
     if assignee_for_validation is not None:
         task_kind_to_check = task_kind_for_validation or _fetch_parent_task_kind(task_no) or "個人"
         _validate_task_kind_assignees(task_kind_to_check, assignee_for_validation)
-    if not updates:
+    if not updates and not attachments:
         return
     params.append(task_no)
     query = f"""
         UPDATE dbo.routine_task
-        SET {', '.join(updates)}, updated_at = SYSUTCDATETIME()
+        SET {', '.join([*updates, 'updated_at = SYSUTCDATETIME()'])}
         WHERE task_no = ?
     """
     current_parent_query = """
@@ -1279,40 +1363,13 @@ def _update_parent(task_no, data):
                 ):
                     raise ValueError("終了月は現在の設定より前にはできません。")
             extension_entries = _build_extension_child_entries(current_parent, data)
-            if assignee_for_validation is not None:
-                old_assignee = current_parent.get("assignee")
-                if _routine_child_has_assignee_column():
-                    if apply_assignee_to_routines:
-                        cursor.execute(
-                            """
-                            UPDATE dbo.routine_task_child
-                            SET assignee = ?, updated_at = SYSUTCDATETIME()
-                            WHERE task_no = ?
-                              AND is_deleted = 0
-                            """,
-                            [assignee_for_validation, task_no],
-                        )
-                    else:
-                        cursor.execute(
-                            """
-                            UPDATE dbo.routine_task_child
-                            SET assignee = COALESCE(assignee, ?),
-                                updated_at = SYSUTCDATETIME()
-                            WHERE task_no = ?
-                              AND is_deleted = 0
-                            """,
-                            [old_assignee, task_no],
-                        )
-            if "summary" in data and data.get("summary") is not None:
-                cursor.execute(
-                    """
-                    UPDATE dbo.routine_task_child
-                    SET summary = ?, updated_at = SYSUTCDATETIME()
-                    WHERE task_no = ?
-                      AND is_deleted = 0
-                    """,
-                    [data.get("summary"), task_no],
-                )
+            _sync_parent_fields_to_children(
+                cursor,
+                task_no,
+                data,
+                assignee_for_validation,
+                task_kind_for_validation,
+            )
             cursor.execute(query, params)
             if extension_entries:
                 cursor.execute(
@@ -1334,6 +1391,7 @@ def _update_parent(task_no, data):
                     payload_rows.append([row_payload[col] for col in child_columns])
                     next_routine_no += 1
                 cursor.executemany(child_query, payload_rows)
+            _insert_attachments(cursor, task_no, attachments or [])
             conn.commit()
     except pyodbc.Error as exc:
         raise RuntimeError("Failed to update parent task") from exc
@@ -1523,6 +1581,23 @@ def create_app():
     app.logger.setLevel(logging.DEBUG)
     logging.basicConfig(level=logging.DEBUG)
     app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "change-me")
+    app.config["MAX_CONTENT_LENGTH"] = 26 * 1024 * 1024
+    notification_logger = logging.getLogger("google_chat")
+    notification_log_path = BASE_DIR / "logs" / "google_chat.log"
+    if not any(isinstance(handler, RotatingFileHandler) and handler.baseFilename == str(notification_log_path)
+               for handler in notification_logger.handlers):
+        try:
+            notification_log_path.parent.mkdir(exist_ok=True)
+            handler = RotatingFileHandler(notification_log_path, maxBytes=1024 * 1024,
+                                          backupCount=3, encoding="utf-8")
+            handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+            notification_logger.addHandler(handler)
+        except OSError:
+            app.logger.warning("Google Chat file logging is unavailable")
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def upload_too_large(error):
+        return jsonify({"message": "\u6dfb\u4ed8\u306e\u5408\u8a08\u306f25MB\u4ee5\u4e0b\u306b\u3057\u3066\u304f\u3060\u3055\u3044\u3002"}), 413
 
     @app.after_request
     def allow_cors(response):
@@ -1540,6 +1615,12 @@ def create_app():
         }
         if request.endpoint in public_endpoints:
             return
+        if request.method in {"POST", "PATCH", "DELETE"} and (
+            request.mimetype == "multipart/form-data" or request.endpoint == "parent_attachment_route"
+        ):
+            origin = request.headers.get("Origin")
+            if origin and urlsplit(origin).netloc != request.host:
+                return jsonify({"message": "Cross-origin file changes are not allowed"}), 403
         if E2E_AUTH_BYPASS:
             if not session.get("user"):
                 display_name = E2E_TEST_UPN.split("@", 1)[0] if E2E_TEST_UPN else "m-mori"
@@ -1624,7 +1705,8 @@ def create_app():
         }
 
     def _handle_create():
-        data = request.get_json(silent=True) or {}
+        data = _task_request_data()
+        attachments = _read_attachments()
         frequency = (data.get("frequency") or "").strip()
         if not frequency:
             return jsonify({"message": "frequency is required"}), 400
@@ -1636,9 +1718,51 @@ def create_app():
         registrant = _extract_user() or "system"
         user_context = _current_user_context()
         parent_entry, entries = _build_entries(data, registrant, user_context.get("department_cd"))
-        parent_id = _insert_entries(parent_entry, entries)
-        _notify_slack_on_create(parent_id, parent_entry, entries)
-        return jsonify({"message": "逋ｻ骭ｲ縺励∪縺励◆", "task_count": len(entries)}), 201
+        parent_id = _insert_entries(parent_entry, entries, attachments)
+        try:
+            creator_names = {
+                str(value).strip().casefold() for value in (
+                    registrant, user_context.get("name"), user_context.get("employee_name")
+                ) if value
+            }
+            creator_emails = {
+                str(value).strip().casefold() for value in (
+                    user_context.get("upn"), _assignee_to_email(registrant)
+                ) if value and "@" in str(value)
+            }
+            assignee_names = []
+            recipients = []
+            for name in _parse_assignees(parent_entry.get("assignee")):
+                if name.strip().casefold() in creator_names:
+                    continue
+                email = _assignee_to_email(name)
+                if email and email.strip().casefold() in creator_emails:
+                    continue
+                assignee_names.append(name)
+                recipients.append(email)
+            known_recipients = [email for email in recipients if email]
+            if assignee_names:
+                notification = notify_task_created(parent_id, parent_entry, entries, known_recipients)
+            else:
+                notification = {"status": "skipped", "reason": "no_other_assignees",
+                                "sent": 0, "total": 0, "posted": False}
+            if any(email is None for email in recipients):
+                notification["total"] += sum(email is None for email in recipients)
+                notification.setdefault("failures", []).extend(
+                    {"recipient": name, "reason": "recipient_not_found"}
+                    for name, email in zip(assignee_names, recipients) if email is None
+                )
+                if notification["status"] != "disabled":
+                    notification["status"] = "partial" if notification["sent"] or notification.get("posted") else "failed"
+        except Exception:
+            app.logger.error("Google Chat recipient resolution failed task=%s", parent_id)
+            notification = {"status": "failed", "sent": 0}
+        try:
+            _notify_slack_on_create(parent_id, parent_entry, entries)
+        except Exception:
+            app.logger.error("Slack notification failed task=%s", parent_id)
+        return jsonify({"message": "\u767b\u9332\u3057\u307e\u3057\u305f\u3002", "task_no": parent_id,
+                        "task_count": len(entries), "google_chat": notification}), 201
     @app.route("/api.py/parents", methods=["GET"])
     @app.route("/routine_app/api.py/parents", methods=["GET"])
     def parent_tasks_route():
@@ -1668,16 +1792,83 @@ def create_app():
     @app.route("/routine_app/api.py/parent/<int:task_no>", methods=["PATCH"])
     def parent_update_route(task_no):
         try:
-            data = request.get_json(silent=True) or {}
-            if not data:
+            data = _task_request_data()
+            attachments = _read_attachments()
+            if not data and not attachments:
                 return jsonify({"message": "no data provided"}), 400
-            _update_parent(task_no, data)
+            _update_parent(task_no, data, attachments)
             return "", 204
         except ValueError as exc:
             return jsonify({"message": str(exc)}), 400
         except RuntimeError as exc:
             app.logger.exception("Parent update failed")
             return jsonify({"message": str(exc)}), 500
+
+    @app.route("/api.py/parent/<int:task_no>/attachments", methods=["GET"])
+    @app.route("/routine_app/api.py/parent/<int:task_no>/attachments", methods=["GET"])
+    def parent_attachments_route(task_no):
+        try:
+            with _get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT task_no FROM dbo.routine_task WHERE task_no = ? AND is_deleted = 0",
+                    [task_no],
+                )
+                if not cursor.fetchone():
+                    return jsonify({"message": "Parent task not found"}), 404
+                cursor.execute(
+                    """SELECT attachment_id, filename, file_size, uploaded_by, created_at
+                       FROM dbo.routine_task_attachment
+                       WHERE task_no = ? AND is_deleted = 0 ORDER BY attachment_id""",
+                    [task_no],
+                )
+                columns = [column[0] for column in cursor.description]
+                attachments = []
+                for row in cursor.fetchall():
+                    attachment = dict(zip(columns, row))
+                    attachment["created_at"] = attachment["created_at"].isoformat()
+                    attachments.append(attachment)
+                return jsonify({"attachments": attachments})
+        except pyodbc.Error:
+            app.logger.exception("Attachment listing failed task=%s", task_no)
+            return jsonify({"message": "\u6dfb\u4ed8\u306e\u53d6\u5f97\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002"}), 500
+
+    @app.route("/api.py/parent/<int:task_no>/attachments/<int:attachment_id>", methods=["GET", "DELETE"])
+    @app.route("/routine_app/api.py/parent/<int:task_no>/attachments/<int:attachment_id>", methods=["GET", "DELETE"])
+    def parent_attachment_route(task_no, attachment_id):
+        try:
+            with _get_db_connection() as conn:
+                cursor = conn.cursor()
+                columns = "a.filename, a.content" if request.method == "GET" else "a.attachment_id"
+                cursor.execute(
+                    f"""SELECT {columns} FROM dbo.routine_task_attachment a
+                        JOIN dbo.routine_task p ON p.task_no = a.task_no
+                        WHERE a.task_no = ? AND a.attachment_id = ?
+                          AND a.is_deleted = 0 AND p.is_deleted = 0""",
+                    [task_no, attachment_id],
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return jsonify({"message": "Attachment not found"}), 404
+                if request.method == "DELETE":
+                    cursor.execute(
+                        """UPDATE dbo.routine_task_attachment
+                           SET is_deleted = 1, deleted_at = SYSUTCDATETIME()
+                           WHERE task_no = ? AND attachment_id = ? AND is_deleted = 0""",
+                        [task_no, attachment_id],
+                    )
+                    conn.commit()
+                    return "", 204
+                response = send_file(
+                    BytesIO(bytes(row[1])), download_name=row[0],
+                    mimetype="application/octet-stream", as_attachment=True,
+                )
+                response.headers["X-Content-Type-Options"] = "nosniff"
+                response.headers["Cache-Control"] = "private, no-store"
+                return response
+        except pyodbc.Error:
+            app.logger.exception("Attachment operation failed task=%s id=%s", task_no, attachment_id)
+            return jsonify({"message": "\u6dfb\u4ed8\u306e\u51e6\u7406\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002"}), 500
 
     @app.route("/api.py/parent/<int:task_no>/complete", methods=["POST"])
     @app.route("/routine_app/api.py/parent/<int:task_no>/complete", methods=["POST"])

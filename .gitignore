@@ -8,3 +8,10 @@ test-results/
 logs/
 wfastcgi.log
 index.html.bak_*
+.pytest_cache/
+routine_app_chat_token.*
+routine_app_directory_token.*
+google-chat-bot*.json
+routine_app_chat_bot.*
+routine_app_bot_source_token.*
+routine_app_space_webhook.*

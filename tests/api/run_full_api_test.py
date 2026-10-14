@@ -243,6 +243,35 @@ def db_child_summaries(task_no: int):
         return [row[0] for row in cur.fetchall()]
 
 
+def db_child_has_column(column: str) -> bool:
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT COL_LENGTH('dbo.routine_task_child', ?)", [column])
+        row = cur.fetchone()
+        return bool(row and row[0] is not None)
+
+
+def db_child_sync_values(task_no: int):
+    columns = ["summary"]
+    for column in ("title", "assignee", "task_kind"):
+        if db_child_has_column(column):
+            columns.append(column)
+    select_sql = ", ".join(columns)
+    with get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            SELECT {select_sql}
+            FROM dbo.routine_task_child
+            WHERE task_no = ?
+              AND is_deleted = 0
+            """,
+            [task_no],
+        )
+        rows = cur.fetchall()
+    return columns, [dict(zip(columns, row)) for row in rows]
+
+
 def db_verify_parent_deleted(task_no: int) -> bool:
     with get_conn() as conn:
         cur = conn.cursor()
@@ -313,11 +342,30 @@ def main():
 
         updated_title = title + '_UPD'
         parent_summary = f'parent updated {c.case_id}'
-        r = client.patch(f'api.py/parent/{task_no}', json={'title': updated_title, 'summary': parent_summary}, timeout=30)
+        updated_assignees = case_assignees[c.case_id]
+        updated_task_kind = c.task_kind
+        r = client.patch(
+            f'api.py/parent/{task_no}',
+            json={
+                'title': updated_title,
+                'summary': parent_summary,
+                'assignee': updated_assignees,
+                'task_kind': updated_task_kind,
+            },
+            timeout=30,
+        )
         assert_status(r, 204, f'{c.case_id} parent update')
-        child_summaries = db_child_summaries(task_no)
-        if child_summaries != [parent_summary] * c.expected_records:
-            raise RuntimeError(f'{c.case_id}: child summaries were not synced from parent')
+        child_columns, child_values = db_child_sync_values(task_no)
+        expected_sync = {
+            'summary': parent_summary,
+            'title': updated_title,
+            'assignee': '; '.join(updated_assignees),
+            'task_kind': updated_task_kind,
+        }
+        for column in child_columns:
+            actual_values = [row[column] for row in child_values]
+            if actual_values != [expected_sync[column]] * c.expected_records:
+                raise RuntimeError(f'{c.case_id}: child {column} values were not synced from parent')
 
         child = db_get_one_active_child(task_no)
         if not child:
